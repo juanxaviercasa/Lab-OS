@@ -1,28 +1,77 @@
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router } from "./_core/trpc";
+import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import {
+  createExperiment,
+  createInventoryItem,
+  createLabTask,
+  createOperationPlan,
+  createSimulatedDevice,
+  getLabDashboard,
+  registerBlockedPhysicalAttempt,
+  resolveOperationPlan,
+  updateLabConfiguration,
+} from "./db";
+import { physicalExecutionStatus, reviewSimulatedPlan } from "./labSafety";
+
+const modeSchema = z.enum(["observacion", "simulacion"]);
+const riskSchema = z.enum(["bajo", "medio", "alto"]);
 
 export const appRouter = router({
-    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return {
-        success: true,
-      } as const;
+      return { success: true } as const;
     }),
   }),
-
-  // TODO: add feature routers here, e.g.
-  // todo: router({
-  //   list: protectedProcedure.query(({ ctx }) =>
-  //     db.getUserTodos(ctx.user.id)
-  //   ),
-  // }),
+  lab: router({
+    dashboard: protectedProcedure.query(({ ctx }) => getLabDashboard(ctx.user.id)),
+    safetyStatus: protectedProcedure.query(() => physicalExecutionStatus()),
+    recordBlockedPhysicalAttempt: protectedProcedure
+      .input(z.object({ intent: z.string().min(3).max(500) }))
+      .mutation(({ ctx, input }) => registerBlockedPhysicalAttempt(ctx.user.id, input.intent)),
+    reviewPlan: protectedProcedure
+      .input(z.object({ mode: modeSchema, riskLevel: riskSchema, preconditions: z.array(z.string()), safeguards: z.array(z.string()) }))
+      .query(({ input }) => reviewSimulatedPlan(input)),
+    configure: protectedProcedure
+      .input(z.object({ name: z.string().min(3).max(120), location: z.string().min(3).max(180), energyThresholdPct: z.string().regex(/^\d+(\.\d{1,2})?$/), integrationNotice: z.string().min(8).max(1000) }))
+      .mutation(({ ctx, input }) => updateLabConfiguration(ctx.user.id, input)),
+    createTask: protectedProcedure
+      .input(z.object({ title: z.string().min(3).max(180), description: z.string().max(1000).optional(), priority: z.enum(["baja", "media", "alta"]) }))
+      .mutation(({ ctx, input }) => createLabTask(ctx.user.id, input)),
+    createInventory: protectedProcedure
+      .input(z.object({ name: z.string().min(2).max(160), category: z.string().min(2).max(80), quantity: z.string().regex(/^\d+(\.\d{1,2})?$/), unit: z.string().min(1).max(24), location: z.string().min(2).max(120), reorderPoint: z.string().regex(/^\d+(\.\d{1,2})?$/) }))
+      .mutation(({ ctx, input }) => createInventoryItem(ctx.user.id, input)),
+    createDevice: protectedProcedure
+      .input(z.object({ name: z.string().min(2).max(120), type: z.enum(["sensor", "actuador", "camara", "controlador", "gateway"]), zoneId: z.number().int().positive().optional(), riskLevel: riskSchema, adapter: z.string().min(3).max(80) }))
+      .mutation(({ ctx, input }) => createSimulatedDevice(ctx.user.id, input)),
+    createExperiment: protectedProcedure
+      .input(z.object({ title: z.string().min(3).max(180), hypothesis: z.string().min(10).max(2000), variables: z.array(z.string().min(1).max(80)).min(1).max(12) }))
+      .mutation(({ ctx, input }) => createExperiment(ctx.user.id, input)),
+    preparePlan: protectedProcedure
+      .input(z.object({ title: z.string().min(3).max(180), objective: z.string().min(10).max(2000), mode: modeSchema, riskLevel: riskSchema, preconditions: z.array(z.string().min(1).max(300)).min(1).max(12), safeguards: z.array(z.string().min(1).max(300)).min(1).max(12) }))
+      .mutation(async ({ ctx, input }) => {
+        const review = reviewSimulatedPlan(input);
+        if (!review.canBePrepared) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: review.missing.join(" ") });
+        }
+        await createOperationPlan(ctx.user.id, {
+          ...input,
+          approvalRequired: review.approvalRequired,
+          status: review.approvalRequired ? "pendiente_aprobacion" : "borrador",
+        });
+        return review;
+      }),
+    resolvePlan: protectedProcedure
+      .input(z.object({ planId: z.number().int().positive(), decision: z.enum(["aprobar", "rechazar"]) }))
+      .mutation(({ ctx, input }) => resolveOperationPlan(ctx.user.id, input.planId, input.decision)),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

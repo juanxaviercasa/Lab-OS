@@ -1,0 +1,21 @@
+# Project TODO
+
+- [x] Definir las entidades y permisos de LabOS para supervisión de cultivo simulado.
+- [x] Crear el modelo de datos para configuración, zonas, sensores, actuadores simulados, alertas, tareas, inventario, experimentos, planes y bitácora.
+- [x] Implementar procedimientos protegidos para consultar y gestionar los datos del laboratorio.
+- [x] Impedir por diseño cualquier control físico directo y registrar todos los intentos de acción.
+- [x] Implementar políticas de riesgo, precondiciones, aprobación humana y modos de observación/simulación.
+- [x] Construir un panel de mando elegante tipo JARVIS con estado del laboratorio, seguridad, energía y próximos pasos.
+- [x] Construir un gemelo digital inicial de la estación de cultivo con zonas, sensores y actuadores simulados.
+- [x] Crear módulos de inventario, dispositivos, tareas, experimentos y bitácora de auditoría.
+- [x] Incorporar placeholders de configuración para laboratorio, ubicación, sensores, equipos, umbrales y credenciales futuras.
+- [x] Preparar contratos de adaptadores para ROS 2, cámaras, sensores y controladores sin habilitar conexiones físicas.
+- [x] Añadir pruebas Vitest para políticas de salvaguarda y funciones principales.
+- [x] Verificar el diseño en escritorio y móvil, corregir errores y guardar un punto de control final.
+- [x] Registrar en la bitácora cualquier intento de acción física bloqueada con severidad y metadatos.
+- [x] Implementar la aprobación o el rechazo humano de planes con registro de responsable, fecha y auditoría.
+- [x] Añadir pruebas Vitest para la preparación de planes y los principales flujos de salvaguarda.
+- [x] Guardar el punto de control final después de validar las mejoras de seguridad.
+- [x] Añadir pruebas Vitest de los procedimientos de preparación, decisión y bloqueo físico con auditoría.
+- [x] Añadir pruebas Vitest de auditoría y persistencia para decisiones humanas e intentos físicos bloqueados.
+- [x] Guardar el punto de control final del proyecto tras la validación completa.
