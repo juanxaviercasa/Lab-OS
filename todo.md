@@ -76,4 +76,4 @@
 - [x] Formalizar el proyecto de autómata de limpieza con capacidades, zonas, flujos de residuos y barreras de seguridad.
 - [x] Construir una vista interactiva del autómata de limpieza para tareas, reciclaje y mantenimiento doméstico simulados.
 - [x] Añadir pruebas y verificación visual de cultivo, asistencia, limpieza y voz.
-- [ ] Guardar y sincronizar la expansión validada de LabOS con GitHub.
+- [x] Guardar y sincronizar la expansión validada de LabOS con GitHub.
