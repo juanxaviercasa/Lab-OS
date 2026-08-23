@@ -93,6 +93,6 @@
 - [x] Preparar dos borradores de revisión clínica sin aprobación ni identidad ficticia, listos para completar por un revisor autorizado.
 - [x] Incorporar umbrales configurables de agua, energía y reciclaje por escenario de limpieza, con veredictos recalculables.
 - [x] Añadir pruebas Vitest y verificación visual de la nueva configuración segura.
-- [ ] Guardar y sincronizar la ampliación de fuente, borradores clínicos y umbrales con GitHub.
+- [x] Guardar y sincronizar la ampliación de fuente, borradores clínicos y umbrales con GitHub.
 - [x] Completar de forma idempotente los borradores clínicos faltantes cuando ya existan registros reales o pendientes.
 - [x] Añadir una prueba Vitest para el caso de un registro clínico existente y un borrador faltante.
