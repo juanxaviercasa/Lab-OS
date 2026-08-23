@@ -143,7 +143,7 @@ async function ensureLabCatalog(labId: number, ownerId?: number) {
   if (!db) return;
   const [sources, initiatives, learningModules, notifications, profiles, kitchenRows, stationRows, voiceProviderRows] = await Promise.all([
     db.select().from(telemetrySources).where(eq(telemetrySources.labId, labId)).limit(1),
-    db.select().from(innovationInitiatives).where(eq(innovationInitiatives.labId, labId)).limit(1),
+    db.select().from(innovationInitiatives).where(eq(innovationInitiatives.labId, labId)),
     db.select().from(robotLearningModules).where(eq(robotLearningModules.labId, labId)).limit(1),
     db.select().from(labNotifications).where(eq(labNotifications.labId, labId)).limit(1),
     db.select().from(learningProfiles).where(eq(learningProfiles.labId, labId)).limit(1),
@@ -154,9 +154,9 @@ async function ensureLabCatalog(labId: number, ownerId?: number) {
   if (!sources.length) {
     await db.insert(telemetrySources).values({ labId, name: "Fuente HTTP de telemetría · Placeholder", kind: "http_json", endpointUrl: "https://telemetry.example.invalid/readings", authMode: "none", credentialReference: null, status: "preparada", schemaJson: JSON.stringify({ expected: "{ readings: [{ metric, value, unit, status? }] }", mode: "solo_lectura", commands: "disabled" }) });
   }
-  if (!initiatives.length) {
-    await db.insert(innovationInitiatives).values(getDefaultInitiatives().map((initiative) => ({ labId, ...initiative })));
-  }
+  const existingInitiativeSlugs = new Set(initiatives.map((initiative) => initiative.slug));
+  const missingInitiatives = getDefaultInitiatives().filter((initiative) => !existingInitiativeSlugs.has(initiative.slug));
+  if (missingInitiatives.length) await db.insert(innovationInitiatives).values(missingInitiatives.map((initiative) => ({ labId, ...initiative })));
   if (!learningModules.length) {
     await db.insert(robotLearningModules).values(getDefaultRobotLearningModules().map((module) => ({ labId, ...module })));
   }

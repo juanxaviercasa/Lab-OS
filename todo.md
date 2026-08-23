@@ -70,3 +70,10 @@
 - [x] Añadir una prueba del proveedor de transcripción y metadatos de audio autorizados.
 - [x] Verificar en pruebas la auditoría y notificación generadas al guardar una práctica de voz.
 - [x] Verificar en pruebas la activación y límite de audio del proveedor persistente de transcripción.
+- [x] Crear una vista detallada del proyecto de cultivo autónomo con etapas, zonas, recursos y salvaguardas simuladas.
+- [x] Implementar una interfaz de tecnología asistiva con ayudas de movilidad, cama y alimentación en modo de simulación segura.
+- [x] Reforzar el reconocimiento de voz con estados de permiso, transcripción, revisión y trazabilidad de sesión.
+- [x] Formalizar el proyecto de autómata de limpieza con capacidades, zonas, flujos de residuos y barreras de seguridad.
+- [x] Construir una vista interactiva del autómata de limpieza para tareas, reciclaje y mantenimiento doméstico simulados.
+- [x] Añadir pruebas y verificación visual de cultivo, asistencia, limpieza y voz.
+- [ ] Guardar y sincronizar la expansión validada de LabOS con GitHub.

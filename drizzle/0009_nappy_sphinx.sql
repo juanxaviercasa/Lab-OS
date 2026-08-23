@@ -1,0 +1,1 @@
+ALTER TABLE `innovationInitiatives` MODIFY COLUMN `category` enum('ia_robotica','agrotech','food_automation','assistive_tech','cleaning_automation') NOT NULL;

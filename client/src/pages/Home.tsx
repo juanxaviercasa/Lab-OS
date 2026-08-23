@@ -16,6 +16,7 @@ import { SimulationTrajectory } from "@/components/SimulationTrajectory";
 import { LearningVoiceStudio } from "@/components/LearningVoiceStudio";
 import { DataFlowExplorer, KitchenMachineDetail } from "@/components/KitchenAndDataFlow";
 import { VoiceServiceRecorder } from "@/components/VoiceServiceRecorder";
+import { AssistiveTechnologyDetail, CleaningAutomatonDetail, CultivationProjectDetail, VoiceRecognitionControl } from "@/components/ExpansionProjectViews";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import {
@@ -54,7 +55,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
-type PageKey = "/" | "/gemelo" | "/operaciones" | "/simulacion" | "/telemetria" | "/experimentos" | "/proyectos" | "/cerebro-robotico" | "/cocina" | "/adaptadores" | "/configuracion";
+type PageKey = "/" | "/gemelo" | "/operaciones" | "/simulacion" | "/telemetria" | "/experimentos" | "/proyectos" | "/cerebro-robotico" | "/cultivo" | "/cocina" | "/asistencia" | "/limpieza" | "/adaptadores" | "/configuracion";
 
 const pageInfo: Record<PageKey, { eyebrow: string; title: string; detail: string }> = {
   "/": { eyebrow: "Supervisión central", title: "Laboratorio bajo observación", detail: "Una vista unificada del cultivo, el consumo y las salvaguardas activas." },
@@ -65,7 +66,10 @@ const pageInfo: Record<PageKey, { eyebrow: string; title: string; detail: string
   "/experimentos": { eyebrow: "Trazabilidad científica", title: "Experimentos e inventario", detail: "Registra hipótesis, materiales y decisiones sin perder la cadena de auditoría." },
   "/proyectos": { eyebrow: "Portafolio de innovación", title: "Iniciativas de largo alcance", detail: "Organiza los programas robóticos, agrícolas, culinarios y asistivos con límites claros y próximos hitos." },
   "/cerebro-robotico": { eyebrow: "Inteligencia educativa", title: "Cerebro robótico educativo", detail: "Diseña un núcleo de tutoría multilingüe y práctica guiada con límites de seguridad explícitos." },
+  "/cultivo": { eyebrow: "Agricultura supervisada", title: "Cultivo autónomo y resiliente", detail: "Explora etapas, recursos, zonas y planes de cultivo dentro de un gemelo digital seguro." },
   "/cocina": { eyebrow: "Automatización alimentaria", title: "Cocina automatizada multicultural", detail: "Modela recetas, preferencias e ingredientes dentro de un gemelo digital sin calor ni manipulación física." },
+  "/asistencia": { eyebrow: "Autonomía y cuidado", title: "Tecnología asistiva", detail: "Organiza escenarios de movilidad, cuidado y alimentación con revisión humana y clínica." },
+  "/limpieza": { eyebrow: "Automatización doméstica", title: "Autómata de limpieza", detail: "Planifica tareas de limpieza, reciclaje y residuos sin movimiento ni manipulación física." },
   "/adaptadores": { eyebrow: "Interoperabilidad futura", title: "Adaptadores aislados", detail: "Contratos preparados para ROS 2 y dispositivos externos, sin secretos ni permisos operativos activos." },
   "/configuracion": { eyebrow: "Placeholders controlados", title: "Configuración del laboratorio", detail: "Completa los datos reales gradualmente sin habilitar ningún control físico." },
 };
@@ -116,7 +120,7 @@ function ErrorState() { return <Panel className="mx-auto mt-12 max-w-xl p-7 text
 
 function LabWorkspace({ page, data }: { page: PageKey; data: any }) {
   const info = pageInfo[page];
-  const selected = page === "/" ? <CommandCenter data={data} /> : page === "/gemelo" ? <TwinPage data={data} /> : page === "/operaciones" ? <OperationsPage data={data} /> : page === "/simulacion" ? <SimulationPage data={data} /> : page === "/telemetria" ? <TelemetryPage data={data} /> : page === "/experimentos" ? <ExperimentsPage data={data} /> : page === "/proyectos" ? <ProjectsPage data={data} /> : page === "/cerebro-robotico" ? <BrainLearningPage data={data} /> : page === "/cocina" ? <KitchenMachineDetail scenarios={data.kitchenScenarios ?? []} stations={data.kitchenStations ?? []} /> : page === "/adaptadores" ? <AdaptersPage data={data} /> : <ConfigurationPage data={data} />;
+  const selected = page === "/" ? <CommandCenter data={data} /> : page === "/gemelo" ? <TwinPage data={data} /> : page === "/operaciones" ? <OperationsPage data={data} /> : page === "/simulacion" ? <SimulationPage data={data} /> : page === "/telemetria" ? <TelemetryPage data={data} /> : page === "/experimentos" ? <ExperimentsPage data={data} /> : page === "/proyectos" ? <ProjectsPage data={data} /> : page === "/cerebro-robotico" ? <BrainLearningPage data={data} /> : page === "/cultivo" ? <CultivationProjectDetail data={data} /> : page === "/cocina" ? <KitchenMachineDetail scenarios={data.kitchenScenarios ?? []} stations={data.kitchenStations ?? []} /> : page === "/asistencia" ? <AssistiveTechnologyDetail /> : page === "/limpieza" ? <CleaningAutomatonDetail /> : page === "/adaptadores" ? <AdaptersPage data={data} /> : <ConfigurationPage data={data} />;
   return <div className="space-y-7"><div className="flex items-start justify-between gap-5"><div><p className="text-[10px] font-semibold uppercase tracking-[0.21em] text-cyan-300">{info.eyebrow}</p><h1 className="mt-1 font-display text-3xl font-medium tracking-tight text-slate-100 sm:text-4xl">{info.title}</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">{info.detail}</p></div><div className="hidden min-w-48 rounded-2xl border border-cyan-300/12 bg-cyan-300/[0.035] p-3 text-right lg:block"><p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Nodo maestro</p><p className="mt-1 text-sm text-cyan-100">{data.lab.name}</p><p className="mt-1 text-xs text-slate-500">{data.lab.location}</p></div></div>{selected}</div>;
 }
 
@@ -131,7 +135,7 @@ function CommandCenter({ data }: { data: any }) {
 
 function SimulationPage({ data }: { data: any }) { return <div className="space-y-6"><TelemetryCharts /><SimulationConsole zones={data.zones} simulations={data.simulations ?? []} /><SimulationComparison simulations={data.simulations ?? []} /><SimulationTrajectory simulations={data.simulations ?? []} /><DataFlowExplorer /></div>; }
 
-function BrainLearningPage({ data }: { data: any }) { return <div className="space-y-6"><RobotBrainDetail modules={data.robotLearningModules ?? []} /><LearningVoiceStudio profiles={data.learningProfiles ?? []} sessions={data.voiceSessions ?? []} /><VoiceServiceRecorder profiles={data.learningProfiles ?? []} providers={data.voiceProviderConfigs ?? []} /></div>; }
+function BrainLearningPage({ data }: { data: any }) { return <div className="space-y-6"><RobotBrainDetail modules={data.robotLearningModules ?? []} /><LearningVoiceStudio profiles={data.learningProfiles ?? []} sessions={data.voiceSessions ?? []} /><VoiceRecognitionControl /><VoiceServiceRecorder profiles={data.learningProfiles ?? []} providers={data.voiceProviderConfigs ?? []} /></div>; }
 
 function TelemetryPage({ data }: { data: any }) { return <div className="space-y-6"><TelemetryCharts /><TelemetrySourcesPanel sources={data.telemetrySources ?? []} /></div>; }
 

@@ -24,8 +24,10 @@ import { startLogin } from "@/const";
 import { NotificationsCenter } from "@/components/NotificationsCenter";
 import { trpc } from "@/lib/trpc";
 import {
+  Accessibility,
   Activity,
   Atom,
+  Bot,
   Boxes,
   ClipboardCheck,
   ChartNoAxesCombined,
@@ -37,6 +39,7 @@ import {
   Network,
   Settings2,
   ShieldCheck,
+  Sprout,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
@@ -50,7 +53,10 @@ const menuItems = [
   { icon: FlaskConical, label: "Experimentos", path: "/experimentos" },
   { icon: Boxes, label: "Proyectos", path: "/proyectos" },
   { icon: Atom, label: "Cerebro robótico", path: "/cerebro-robotico" },
+  { icon: Sprout, label: "Cultivo autónomo", path: "/cultivo" },
   { icon: CookingPot, label: "Cocina automatizada", path: "/cocina" },
+  { icon: Accessibility, label: "Tecnología asistiva", path: "/asistencia" },
+  { icon: Bot, label: "Autómata de limpieza", path: "/limpieza" },
   { icon: Network, label: "Adaptadores", path: "/adaptadores" },
   { icon: Settings2, label: "Configuración", path: "/configuracion" },
 ];

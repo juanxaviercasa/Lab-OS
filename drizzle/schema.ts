@@ -182,7 +182,7 @@ export const innovationInitiatives = mysqlTable("innovationInitiatives", {
   labId: int("labId").notNull(),
   slug: varchar("slug", { length: 80 }).notNull(),
   name: varchar("name", { length: 180 }).notNull(),
-  category: mysqlEnum("category", ["ia_robotica", "agrotech", "food_automation", "assistive_tech"]).notNull(),
+  category: mysqlEnum("category", ["ia_robotica", "agrotech", "food_automation", "assistive_tech", "cleaning_automation"]).notNull(),
   status: mysqlEnum("status", ["vision", "diseno", "prototipo", "piloto"]).default("vision").notNull(),
   safetyScope: varchar("safetyScope", { length: 180 }).notNull(),
   objective: text("objective").notNull(),
