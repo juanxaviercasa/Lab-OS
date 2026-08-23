@@ -28,9 +28,10 @@ describe("persistencia del adaptador de telemetría", () => {
   it("guarda una fuente pública como solo lectura y registra auditoría", async () => {
     const fake = createFakeDb(); __setDbForTesting(fake.db);
     await createTelemetrySource(42, { name: "Fuente externa", endpointUrl: "https://telemetry.example.org/readings", authMode: "none" });
-    expect(fake.inserts).toHaveLength(2);
+    expect(fake.inserts).toHaveLength(3);
     expect(fake.inserts[0]?.values).toMatchObject({ labId: 8, name: "Fuente externa", status: "preparada", authMode: "none" });
     expect(fake.inserts[1]?.values).toMatchObject({ eventType: "telemetry.source_created", metadataJson: expect.stringContaining("physicalExecution") });
+    expect(fake.inserts[2]?.values).toMatchObject({ kind: "sistema", title: "Fuente de telemetría preparada", unread: true });
     await expect(createTelemetrySource(42, { name: "Insegura", endpointUrl: "http://telemetry.example.org/readings", authMode: "none" })).rejects.toThrow("HTTPS");
   });
 

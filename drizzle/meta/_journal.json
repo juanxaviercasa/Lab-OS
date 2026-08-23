@@ -36,6 +36,13 @@
       "when": 1787506781238,
       "tag": "0004_careful_korvac",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1787507792805,
+      "tag": "0005_panoramic_puppet_master",
+      "breakpoints": true
     }
   ]
 }

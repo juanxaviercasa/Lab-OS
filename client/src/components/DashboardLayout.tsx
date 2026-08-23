@@ -21,6 +21,8 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
+import { NotificationsCenter } from "@/components/NotificationsCenter";
+import { trpc } from "@/lib/trpc";
 import {
   Activity,
   Atom,
@@ -46,6 +48,7 @@ const menuItems = [
   { icon: Radio, label: "Telemetría", path: "/telemetria" },
   { icon: FlaskConical, label: "Experimentos", path: "/experimentos" },
   { icon: Boxes, label: "Proyectos", path: "/proyectos" },
+  { icon: Atom, label: "Cerebro robótico", path: "/cerebro-robotico" },
   { icon: Network, label: "Adaptadores", path: "/adaptadores" },
   { icon: Settings2, label: "Configuración", path: "/configuracion" },
 ];
@@ -75,6 +78,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 function DashboardContent({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
+  const notifications = trpc.lab.dashboard.useQuery(undefined, { refetchInterval: 45000 });
   const active = menuItems.find((item) => item.path === location) ?? menuItems[0];
 
   return (
@@ -130,7 +134,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       <SidebarInset className="min-h-screen bg-[#060a10] text-slate-100 lab-grid">
         <header className="sticky top-0 z-20 flex h-[84px] items-center justify-between border-b border-cyan-100/10 bg-[#060a10]/80 px-5 backdrop-blur-xl lg:px-8">
           <div className="flex items-center gap-3"><SidebarTrigger className="text-slate-300 hover:bg-white/5 hover:text-cyan-200" /><div><p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">LabOS / {active.label}</p><h2 className="font-display text-lg font-medium text-slate-100">Centro de supervisión</h2></div></div>
-          <div className="flex items-center gap-2"><Badge variant="outline" className="hidden border-cyan-300/20 bg-cyan-300/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.13em] text-cyan-200 sm:flex"><Activity className="mr-1.5 size-3" />Telemetría simulada</Badge><Badge variant="outline" className="border-amber-300/20 bg-amber-300/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.13em] text-amber-200">Sin control físico</Badge></div>
+          <div className="flex items-center gap-2"><NotificationsCenter notifications={notifications.data?.notifications} /><Badge variant="outline" className="hidden border-cyan-300/20 bg-cyan-300/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.13em] text-cyan-200 sm:flex"><Activity className="mr-1.5 size-3" />Telemetría simulada</Badge><Badge variant="outline" className="border-amber-300/20 bg-amber-300/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.13em] text-amber-200">Sin control físico</Badge></div>
         </header>
         <main className="mx-auto w-full max-w-[1640px] flex-1 px-5 py-6 lg:px-8 lg:py-8">{children}</main>
       </SidebarInset>

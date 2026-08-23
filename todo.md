@@ -41,3 +41,16 @@
 - [x] Añadir pruebas Vitest de creación y vista previa de fuentes de telemetría de solo lectura.
 - [x] Añadir pruebas Vitest de la lógica comparativa y la estructura del portafolio de iniciativas.
 - [x] Añadir pruebas Vitest del flujo persistente de creación y vista previa de fuentes de telemetría.
+- [x] Verificar el repositorio GitHub de destino y preparar la sincronización de código.
+- [x] Crear una vista detallada para el cerebro robótico educativo con arquitectura, módulos y plan de aprendizaje.
+- [x] Añadir visualizaciones interactivas de trayectorias, diferencias y umbrales al comparador de simulaciones.
+- [x] Implementar un centro de notificaciones en el panel para lecturas nuevas, alertas y eventos de auditoría.
+- [x] Añadir pruebas y verificación visual de cerebro robótico, gráficos y notificaciones.
+- [x] Guardar un punto de control y sincronizar la versión validada con GitHub.
+- [x] Añadir el remoto de GitHub y verificar la autenticación antes de sincronizar la rama principal.
+- [x] Generar notificaciones para decisiones humanas y bloqueos físicos auditables.
+- [x] Añadir pruebas de persistencia de notificaciones, módulos del cerebro robótico y trayectorias comparativas.
+- [x] Añadir pruebas de persistencia de notificaciones para bloqueos, decisiones y marcado como leído.
+- [x] Añadir pruebas de entrega de módulos educativos y notificaciones desde el panel de datos.
+- [x] Añadir una prueba de trayectorias basada en resultados de simulación consumibles por la interfaz.
+- [x] Mover y ejecutar la prueba de trayectorias en una ruta incluida por la batería de Vitest.

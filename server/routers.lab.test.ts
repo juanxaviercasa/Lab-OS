@@ -10,13 +10,14 @@ vi.mock("./db", () => ({
   createTelemetrySource: vi.fn(),
   getLabDashboard: vi.fn(),
   getTelemetryHistory: vi.fn(),
+  markNotificationsRead: vi.fn(),
   previewTelemetrySource: vi.fn(),
   registerBlockedPhysicalAttempt: vi.fn(),
   resolveOperationPlan: vi.fn(),
   updateLabConfiguration: vi.fn(),
 }));
 
-import { createOperationPlan, createTelemetrySource, getTelemetryHistory, previewTelemetrySource, registerBlockedPhysicalAttempt, resolveOperationPlan } from "./db";
+import { createOperationPlan, createTelemetrySource, getTelemetryHistory, markNotificationsRead, previewTelemetrySource, registerBlockedPhysicalAttempt, resolveOperationPlan } from "./db";
 import { appRouter } from "./routers";
 
 const user = {
@@ -118,5 +119,13 @@ describe("procedimientos de LabOS", () => {
     expect(createTelemetrySource).toHaveBeenCalledWith(user.id, { name: "Fuente pública", endpointUrl: "https://telemetry.example.org/readings", authMode: "none" });
     expect(previewTelemetrySource).toHaveBeenCalledWith(user.id, 9);
     expect(preview).toEqual([{ metric: "Humedad", value: 61, unit: "%", status: "normal" }]);
+  });
+
+  it("marca las notificaciones indicadas como leídas", async () => {
+    vi.mocked(markNotificationsRead).mockResolvedValue({ updated: 2 });
+    const caller = appRouter.createCaller(createContext());
+    const result = await caller.lab.markNotificationsRead({ notificationIds: [3, 4] });
+    expect(markNotificationsRead).toHaveBeenCalledWith(user.id, [3, 4]);
+    expect(result).toEqual({ updated: 2 });
   });
 });

@@ -7,9 +7,11 @@ import {
   integrationAdapters,
   innovationInitiatives,
   inventoryItems,
+  labNotifications,
   labs,
   labTasks,
   operationPlans,
+  robotLearningModules,
   sensorReadings,
   simulationRuns,
   telemetrySources,
@@ -22,6 +24,8 @@ import { runSimulationProjection, type SimulationScenario } from "./labSimulatio
 import { selectTelemetryMetric, selectTelemetryWindow } from "./labAnalytics";
 import { normalizeTelemetryPayload, validatePublicTelemetryUrl } from "./labTelemetrySource";
 import { getDefaultInitiatives } from "./labPortfolio";
+import { blockedPhysicalNotification, planDecisionNotification } from "./labNotifications";
+import { getDefaultRobotLearningModules } from "./robotLearning";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -91,6 +95,12 @@ async function appendAudit(
   });
 }
 
+async function createLabNotification(labId: number, kind: "telemetria" | "simulacion" | "seguridad" | "sistema", severity: "info" | "atencion" | "critico", title: string, detail: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(labNotifications).values({ labId, kind, severity, title, detail, unread: true });
+}
+
 async function ensureHistoricalTelemetry(labId: number, deviceIds: number[]) {
   const db = await getDb();
   if (!db || deviceIds.length === 0) return;
@@ -123,9 +133,11 @@ async function ensureHistoricalTelemetry(labId: number, deviceIds: number[]) {
 async function ensureLabCatalog(labId: number) {
   const db = await getDb();
   if (!db) return;
-  const [sources, initiatives] = await Promise.all([
+  const [sources, initiatives, learningModules, notifications] = await Promise.all([
     db.select().from(telemetrySources).where(eq(telemetrySources.labId, labId)).limit(1),
     db.select().from(innovationInitiatives).where(eq(innovationInitiatives.labId, labId)).limit(1),
+    db.select().from(robotLearningModules).where(eq(robotLearningModules.labId, labId)).limit(1),
+    db.select().from(labNotifications).where(eq(labNotifications.labId, labId)).limit(1),
   ]);
   if (!sources.length) {
     await db.insert(telemetrySources).values({ labId, name: "Fuente HTTP de telemetría · Placeholder", kind: "http_json", endpointUrl: "https://telemetry.example.invalid/readings", authMode: "none", credentialReference: null, status: "preparada", schemaJson: JSON.stringify({ expected: "{ readings: [{ metric, value, unit, status? }] }", mode: "solo_lectura", commands: "disabled" }) });
@@ -133,6 +145,10 @@ async function ensureLabCatalog(labId: number) {
   if (!initiatives.length) {
     await db.insert(innovationInitiatives).values(getDefaultInitiatives().map((initiative) => ({ labId, ...initiative })));
   }
+  if (!learningModules.length) {
+    await db.insert(robotLearningModules).values(getDefaultRobotLearningModules().map((module) => ({ labId, ...module })));
+  }
+  if (!notifications.length) await createLabNotification(labId, "sistema", "info", "Centro de notificaciones listo", "LabOS avisará sobre lecturas nuevas, resultados de simulación y eventos de seguridad.");
 }
 
 export async function ensureLabForUser(ownerId: number) {
@@ -314,7 +330,7 @@ export async function getLabDashboard(ownerId: number) {
   const sensorDeviceIds = deviceRows.filter((item) => item.type === "sensor").map((item) => item.id);
   await ensureHistoricalTelemetry(lab.id, sensorDeviceIds);
   const deviceIds = deviceRows.map((item) => item.id);
-  const [zoneRows, readingRows, taskRows, inventoryRows, experimentRows, planRows, auditRows, adapterRows, simulationRows, sourceRows, initiativeRows] = await Promise.all([
+  const [zoneRows, readingRows, taskRows, inventoryRows, experimentRows, planRows, auditRows, adapterRows, simulationRows, sourceRows, initiativeRows, moduleRows, notificationRows] = await Promise.all([
     db.select().from(zones).where(eq(zones.labId, lab.id)),
     deviceIds.length ? db.select().from(sensorReadings).where(inArray(sensorReadings.deviceId, deviceIds)).orderBy(desc(sensorReadings.recordedAt)).limit(16) : Promise.resolve([]),
     db.select().from(labTasks).where(eq(labTasks.labId, lab.id)).orderBy(desc(labTasks.updatedAt)),
@@ -326,9 +342,11 @@ export async function getLabDashboard(ownerId: number) {
     db.select().from(simulationRuns).where(eq(simulationRuns.labId, lab.id)).orderBy(desc(simulationRuns.createdAt)).limit(12),
     db.select().from(telemetrySources).where(eq(telemetrySources.labId, lab.id)).orderBy(desc(telemetrySources.updatedAt)),
     db.select().from(innovationInitiatives).where(eq(innovationInitiatives.labId, lab.id)).orderBy(desc(innovationInitiatives.updatedAt)),
+    db.select().from(robotLearningModules).where(eq(robotLearningModules.labId, lab.id)).orderBy(desc(robotLearningModules.progressPct)),
+    db.select().from(labNotifications).where(eq(labNotifications.labId, lab.id)).orderBy(desc(labNotifications.createdAt)).limit(24),
   ]);
 
-  return { lab, zones: zoneRows, devices: deviceRows, readings: readingRows, tasks: taskRows, inventory: inventoryRows, experiments: experimentRows, plans: planRows, audit: auditRows, adapters: adapterRows, simulations: simulationRows, telemetrySources: sourceRows, initiatives: initiativeRows };
+  return { lab, zones: zoneRows, devices: deviceRows, readings: readingRows, tasks: taskRows, inventory: inventoryRows, experiments: experimentRows, plans: planRows, audit: auditRows, adapters: adapterRows, simulations: simulationRows, telemetrySources: sourceRows, initiatives: initiativeRows, robotLearningModules: moduleRows, notifications: notificationRows };
 }
 
 export async function getTelemetryHistory(ownerId: number, metric?: string, periodHours = 24) {
@@ -417,6 +435,8 @@ export async function registerBlockedPhysicalAttempt(ownerId: number, intent: st
   const status = physicalExecutionStatus();
   const audit = buildBlockedPhysicalAttemptAudit(intent);
   await appendAudit(lab.id, ownerId, audit.eventType, audit.message, audit.severity, audit.metadata);
+  const notification = blockedPhysicalNotification(intent);
+  await createLabNotification(lab.id, notification.kind, notification.severity, notification.title, notification.detail);
   return status;
 }
 
@@ -434,6 +454,8 @@ export async function resolveOperationPlan(ownerId: number, planId: number, deci
     .set(persistence.planUpdate)
     .where(eq(operationPlans.id, planId));
   await appendAudit(lab.id, ownerId, persistence.audit.eventType, persistence.audit.message, persistence.audit.severity, persistence.audit.metadata);
+  const notification = planDecisionNotification(decision, plan.title);
+  await createLabNotification(lab.id, notification.kind, notification.severity, notification.title, notification.detail);
   return { status: persistence.planUpdate.status, physicalExecution: physicalExecutionStatus() };
 }
 
@@ -455,6 +477,7 @@ export async function createSimulationRun(ownerId: number, input: { scenario: Si
     status: "completada",
   });
   await appendAudit(lab.id, ownerId, "simulation.completed", `Se completó una proyección de ${input.scenario} sin control físico.`, "info", { scenario: input.scenario, durationHours: input.durationHours, targetZone: input.targetZone, outcome: projection.result.outcome, physicalExecution: "disabled" });
+  await createLabNotification(lab.id, "simulacion", projection.result.outcome === "estable" ? "info" : "atencion", "Nueva proyección disponible", `${projection.title} quedó disponible para revisión y comparación.`);
   return projection;
 }
 
@@ -465,6 +488,7 @@ export async function createTelemetrySource(ownerId: number, input: { name: stri
   const endpointUrl = validatePublicTelemetryUrl(input.endpointUrl);
   await db.insert(telemetrySources).values({ labId: lab.id, name: input.name, kind: "http_json", endpointUrl, authMode: input.authMode, credentialReference: input.credentialReference?.trim() || null, status: "preparada", schemaJson: JSON.stringify({ expected: "{ readings: [{ metric, value, unit, status? }] }", mode: "solo_lectura", commands: "disabled" }) });
   await appendAudit(lab.id, ownerId, "telemetry.source_created", `Se registró una fuente de telemetría de solo lectura: ${input.name}`, "info", { endpointUrl, authMode: input.authMode, physicalExecution: "disabled" });
+  await createLabNotification(lab.id, "sistema", "info", "Fuente de telemetría preparada", `${input.name} permanece en modo de solo lectura y sin control físico.`);
 }
 
 export async function previewTelemetrySource(ownerId: number, sourceId: number) {
@@ -483,5 +507,17 @@ export async function previewTelemetrySource(ownerId: number, sourceId: number) 
   await db.insert(sensorReadings).values(points.map((point) => ({ deviceId: sensor.id, metric: point.metric, unit: point.unit, value: point.value.toFixed(3), thresholdLow: null, thresholdHigh: null, status: point.status, source: "adaptador" as const })));
   await db.update(telemetrySources).set({ status: "conectada", lastCheckedAt: new Date() }).where(eq(telemetrySources.id, source.id));
   await appendAudit(lab.id, ownerId, "telemetry.source_previewed", `Se importaron ${points.length} lecturas desde una fuente de solo lectura.`, "info", { sourceId, readings: points.length, physicalExecution: "disabled" });
+  await createLabNotification(lab.id, "telemetria", points.some((point) => point.status !== "normal") ? "atencion" : "info", "Nuevas lecturas recibidas", `${points.length} lecturas nuevas se incorporaron desde ${source.name}.`);
   return points;
+}
+
+export async function markNotificationsRead(ownerId: number, notificationIds?: number[]) {
+  const db = await getDb();
+  if (!db) throw new Error("La base de datos no está disponible.");
+  const lab = await ensureLabForUser(ownerId);
+  const rows = await db.select().from(labNotifications).where(eq(labNotifications.labId, lab.id));
+  const accepted = notificationIds?.length ? rows.filter((item) => notificationIds.includes(item.id)) : rows;
+  if (!accepted.length) return { updated: 0 };
+  await Promise.all(accepted.map((item) => db.update(labNotifications).set({ unread: false }).where(eq(labNotifications.id, item.id))));
+  return { updated: accepted.length };
 }

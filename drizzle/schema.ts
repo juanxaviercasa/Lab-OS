@@ -191,6 +191,31 @@ export const innovationInitiatives = mysqlTable("innovationInitiatives", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const robotLearningModules = mysqlTable("robotLearningModules", {
+  id: int("id").autoincrement().primaryKey(),
+  labId: int("labId").notNull(),
+  initiativeSlug: varchar("initiativeSlug", { length: 80 }).notNull(),
+  name: varchar("name", { length: 160 }).notNull(),
+  capability: varchar("capability", { length: 120 }).notNull(),
+  mode: mysqlEnum("mode", ["dialogo", "simulacion", "evaluacion", "planificacion"]).notNull(),
+  readiness: mysqlEnum("readiness", ["concepto", "diseno", "prototipo"]).default("concepto").notNull(),
+  safetyBoundary: text("safetyBoundary").notNull(),
+  progressPct: int("progressPct").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const labNotifications = mysqlTable("labNotifications", {
+  id: int("id").autoincrement().primaryKey(),
+  labId: int("labId").notNull(),
+  kind: mysqlEnum("kind", ["telemetria", "simulacion", "seguridad", "sistema"]).notNull(),
+  severity: mysqlEnum("severity", ["info", "atencion", "critico"]).default("info").notNull(),
+  title: varchar("title", { length: 180 }).notNull(),
+  detail: text("detail").notNull(),
+  unread: boolean("unread").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export const integrationAdapters = mysqlTable("integrationAdapters", {
   id: int("id").autoincrement().primaryKey(),
   labId: int("labId").notNull(),
@@ -213,3 +238,5 @@ export type OperationPlan = typeof operationPlans.$inferSelect;
 export type SimulationRun = typeof simulationRuns.$inferSelect;
 export type TelemetrySource = typeof telemetrySources.$inferSelect;
 export type InnovationInitiative = typeof innovationInitiatives.$inferSelect;
+export type RobotLearningModule = typeof robotLearningModules.$inferSelect;
+export type LabNotification = typeof labNotifications.$inferSelect;

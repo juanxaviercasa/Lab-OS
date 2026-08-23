@@ -7,7 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 
 function Router() {
-  return <Switch><Route path="/" component={Home} /><Route path="/gemelo" component={Home} /><Route path="/operaciones" component={Home} /><Route path="/simulacion" component={Home} /><Route path="/telemetria" component={Home} /><Route path="/experimentos" component={Home} /><Route path="/proyectos" component={Home} /><Route path="/adaptadores" component={Home} /><Route path="/configuracion" component={Home} /><Route path="/404" component={NotFound} /><Route component={NotFound} /></Switch>;
+  return <Switch><Route path="/" component={Home} /><Route path="/gemelo" component={Home} /><Route path="/operaciones" component={Home} /><Route path="/simulacion" component={Home} /><Route path="/telemetria" component={Home} /><Route path="/experimentos" component={Home} /><Route path="/proyectos" component={Home} /><Route path="/cerebro-robotico" component={Home} /><Route path="/adaptadores" component={Home} /><Route path="/configuracion" component={Home} /><Route path="/404" component={NotFound} /><Route component={NotFound} /></Switch>;
 }
 
 export default function App() {

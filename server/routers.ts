@@ -14,6 +14,7 @@ import {
   createTelemetrySource,
   getLabDashboard,
   getTelemetryHistory,
+  markNotificationsRead,
   previewTelemetrySource,
   registerBlockedPhysicalAttempt,
   resolveOperationPlan,
@@ -87,6 +88,9 @@ export const appRouter = router({
     previewTelemetrySource: protectedProcedure
       .input(z.object({ sourceId: z.number().int().positive() }))
       .mutation(({ ctx, input }) => previewTelemetrySource(ctx.user.id, input.sourceId)),
+    markNotificationsRead: protectedProcedure
+      .input(z.object({ notificationIds: z.array(z.number().int().positive()).max(24).optional() }).optional())
+      .mutation(({ ctx, input }) => markNotificationsRead(ctx.user.id, input?.notificationIds)),
   }),
 });
 
