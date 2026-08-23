@@ -8,12 +8,13 @@ vi.mock("./db", () => ({
   createOperationPlan: vi.fn(),
   createSimulatedDevice: vi.fn(),
   getLabDashboard: vi.fn(),
+  getTelemetryHistory: vi.fn(),
   registerBlockedPhysicalAttempt: vi.fn(),
   resolveOperationPlan: vi.fn(),
   updateLabConfiguration: vi.fn(),
 }));
 
-import { createOperationPlan, registerBlockedPhysicalAttempt, resolveOperationPlan } from "./db";
+import { createOperationPlan, getTelemetryHistory, registerBlockedPhysicalAttempt, resolveOperationPlan } from "./db";
 import { appRouter } from "./routers";
 
 const user = {
@@ -78,9 +79,9 @@ describe("procedimientos de LabOS", () => {
       physicalExecution: { allowed: false, code: "PHYSICAL_CONTROL_DISABLED", message: "Bloqueado" },
     });
     const caller = appRouter.createCaller(createContext());
-    const result = await caller.lab.resolvePlan({ planId: 7, decision: "aprobar" });
+    const result = await caller.lab.resolvePlan({ planId: 7, decision: "aprobar", decisionNote: "Se revisaron los umbrales simulados." });
 
-    expect(resolveOperationPlan).toHaveBeenCalledWith(user.id, 7, "aprobar");
+    expect(resolveOperationPlan).toHaveBeenCalledWith(user.id, 7, "aprobar", "Se revisaron los umbrales simulados.");
     expect(result.physicalExecution.allowed).toBe(false);
   });
 
@@ -95,5 +96,14 @@ describe("procedimientos de LabOS", () => {
 
     expect(registerBlockedPhysicalAttempt).toHaveBeenCalledWith(user.id, "Abrir válvula real");
     expect(result).toMatchObject({ allowed: false, code: "PHYSICAL_CONTROL_DISABLED" });
+  });
+
+  it("consulta telemetría por métrica y periodo, incluido un historial vacío", async () => {
+    vi.mocked(getTelemetryHistory).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    const caller = appRouter.createCaller(createContext());
+    await expect(caller.lab.telemetryHistory({ metric: "Humedad del sustrato", periodHours: 72 })).resolves.toEqual([]);
+    await expect(caller.lab.telemetryHistory({ periodHours: 24 })).resolves.toEqual([]);
+    expect(getTelemetryHistory).toHaveBeenNthCalledWith(1, user.id, "Humedad del sustrato", 72);
+    expect(getTelemetryHistory).toHaveBeenNthCalledWith(2, user.id, undefined, 24);
   });
 });

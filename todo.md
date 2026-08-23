@@ -19,3 +19,14 @@
 - [x] Añadir pruebas Vitest de los procedimientos de preparación, decisión y bloqueo físico con auditoría.
 - [x] Añadir pruebas Vitest de auditoría y persistencia para decisiones humanas e intentos físicos bloqueados.
 - [x] Guardar el punto de control final del proyecto tras la validación completa.
+- [x] Ampliar la telemetría simulada con series históricas consultables por métrica y periodo.
+- [x] Incorporar gráficos interactivos de humedad, temperatura, conductividad y reserva energética.
+- [x] Crear un módulo de simulación con escenario, supuestos, proyección y comparación contra umbrales.
+- [x] Implementar una vista detallada de revisión humana con evidencia, precondiciones y salvaguardas de cada plan.
+- [x] Permitir aprobar o rechazar planes simulados con nota de decisión, identidad, fecha y bitácora.
+- [x] Añadir pruebas y verificación visual de los módulos de analítica, simulación y revisión.
+- [x] Guardar un punto de control actualizado de la ampliación de LabOS.
+- [x] Añadir filtro de periodo a las series históricas en API y panel analítico.
+- [x] Persistir identidad y fecha para las decisiones de rechazo y mostrarlas en la revisión.
+- [x] Añadir pruebas Vitest para consultas de telemetría por métrica y periodo.
+- [x] Añadir pruebas Vitest del procedimiento de telemetría por métrica, periodo y ausencia de datos.

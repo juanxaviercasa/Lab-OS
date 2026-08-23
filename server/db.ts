@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { asc, desc, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   auditLogs,
@@ -10,11 +10,14 @@ import {
   labTasks,
   operationPlans,
   sensorReadings,
+  simulationRuns,
   type InsertUser,
   users,
   zones,
 } from "../drizzle/schema";
 import { buildBlockedPhysicalAttemptAudit, buildPlanDecisionPersistence, physicalExecutionStatus } from "./labSafety";
+import { runSimulationProjection, type SimulationScenario } from "./labSimulation";
+import { selectTelemetryMetric, selectTelemetryWindow } from "./labAnalytics";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -77,6 +80,35 @@ async function appendAudit(
     message,
     metadataJson: metadata ? JSON.stringify(metadata) : null,
   });
+}
+
+async function ensureHistoricalTelemetry(labId: number, deviceIds: number[]) {
+  const db = await getDb();
+  if (!db || deviceIds.length === 0) return;
+  const existing = await db.select().from(sensorReadings).where(inArray(sensorReadings.deviceId, deviceIds));
+  if (existing.length >= 28) return;
+
+  const deviceId = deviceIds[0];
+  const now = Date.now();
+  const definitions = [
+    { metric: "Humedad del sustrato", unit: "%", values: [55, 57, 59, 58, 60, 63, 62, 61], low: "45.000", high: "75.000" },
+    { metric: "Temperatura ambiente", unit: "°C", values: [21.6, 22.1, 22.7, 23.1, 23.8, 24.2, 23.7, 23.4], low: "18.000", high: "28.000" },
+    { metric: "Conductividad del depósito", unit: "mS/cm", values: [1.62, 1.68, 1.71, 1.77, 1.82, 1.88, 1.86, 1.84], low: "1.200", high: "2.200" },
+    { metric: "Reserva energética", unit: "%", values: [78, 77, 75, 74, 73, 72, 71, 72], low: "25.000", high: "100.000" },
+  ];
+  const rows = definitions.flatMap((definition) => definition.values.map((value, index) => ({
+    deviceId,
+    metric: definition.metric,
+    unit: definition.unit,
+    value: value.toFixed(3),
+    thresholdLow: definition.low,
+    thresholdHigh: definition.high,
+    status: definition.metric === "Conductividad del depósito" && index === definition.values.length - 1 ? "atencion" as const : "normal" as const,
+    source: "simulacion" as const,
+    recordedAt: new Date(now - (definition.values.length - index) * 3 * 60 * 60 * 1000),
+  })));
+  await db.insert(sensorReadings).values(rows);
+  await appendAudit(labId, null, "telemetry.history_seeded", "Se inicializaron series históricas simuladas para el panel analítico.", "info", { samples: rows.length });
 }
 
 export async function ensureLabForUser(ownerId: number) {
@@ -253,19 +285,36 @@ export async function getLabDashboard(ownerId: number) {
   const db = await getDb();
   if (!db) throw new Error("La base de datos no está disponible.");
   const lab = await ensureLabForUser(ownerId);
-  const [zoneRows, deviceRows, readingRows, taskRows, inventoryRows, experimentRows, planRows, auditRows, adapterRows] = await Promise.all([
+  const deviceRows = await db.select().from(devices).where(eq(devices.labId, lab.id));
+  const sensorDeviceIds = deviceRows.filter((item) => item.type === "sensor").map((item) => item.id);
+  await ensureHistoricalTelemetry(lab.id, sensorDeviceIds);
+  const deviceIds = deviceRows.map((item) => item.id);
+  const [zoneRows, readingRows, taskRows, inventoryRows, experimentRows, planRows, auditRows, adapterRows, simulationRows] = await Promise.all([
     db.select().from(zones).where(eq(zones.labId, lab.id)),
-    db.select().from(devices).where(eq(devices.labId, lab.id)),
-    db.select().from(sensorReadings).orderBy(desc(sensorReadings.recordedAt)).limit(12),
+    deviceIds.length ? db.select().from(sensorReadings).where(inArray(sensorReadings.deviceId, deviceIds)).orderBy(desc(sensorReadings.recordedAt)).limit(16) : Promise.resolve([]),
     db.select().from(labTasks).where(eq(labTasks.labId, lab.id)).orderBy(desc(labTasks.updatedAt)),
     db.select().from(inventoryItems).where(eq(inventoryItems.labId, lab.id)).orderBy(desc(inventoryItems.updatedAt)),
     db.select().from(experiments).where(eq(experiments.labId, lab.id)).orderBy(desc(experiments.updatedAt)),
     db.select().from(operationPlans).where(eq(operationPlans.labId, lab.id)).orderBy(desc(operationPlans.updatedAt)),
     db.select().from(auditLogs).where(eq(auditLogs.labId, lab.id)).orderBy(desc(auditLogs.createdAt)).limit(20),
     db.select().from(integrationAdapters).where(eq(integrationAdapters.labId, lab.id)),
+    db.select().from(simulationRuns).where(eq(simulationRuns.labId, lab.id)).orderBy(desc(simulationRuns.createdAt)).limit(12),
   ]);
 
-  return { lab, zones: zoneRows, devices: deviceRows, readings: readingRows, tasks: taskRows, inventory: inventoryRows, experiments: experimentRows, plans: planRows, audit: auditRows, adapters: adapterRows };
+  return { lab, zones: zoneRows, devices: deviceRows, readings: readingRows, tasks: taskRows, inventory: inventoryRows, experiments: experimentRows, plans: planRows, audit: auditRows, adapters: adapterRows, simulations: simulationRows };
+}
+
+export async function getTelemetryHistory(ownerId: number, metric?: string, periodHours = 24) {
+  const db = await getDb();
+  if (!db) throw new Error("La base de datos no está disponible.");
+  const lab = await ensureLabForUser(ownerId);
+  const deviceRows = await db.select().from(devices).where(eq(devices.labId, lab.id));
+  const deviceIds = deviceRows.map((item) => item.id);
+  await ensureHistoricalTelemetry(lab.id, deviceRows.filter((item) => item.type === "sensor").map((item) => item.id));
+  if (!deviceIds.length) return [];
+  const rows = await db.select().from(sensorReadings).where(inArray(sensorReadings.deviceId, deviceIds)).orderBy(asc(sensorReadings.recordedAt));
+  const selectedMetric = selectTelemetryMetric(rows, metric);
+  return selectTelemetryWindow(selectedMetric, periodHours);
 }
 
 export async function createLabTask(ownerId: number, input: { title: string; description?: string; priority: "baja" | "media" | "alta" }) {
@@ -344,7 +393,7 @@ export async function registerBlockedPhysicalAttempt(ownerId: number, intent: st
   return status;
 }
 
-export async function resolveOperationPlan(ownerId: number, planId: number, decision: "aprobar" | "rechazar") {
+export async function resolveOperationPlan(ownerId: number, planId: number, decision: "aprobar" | "rechazar", decisionNote: string) {
   const db = await getDb();
   if (!db) throw new Error("La base de datos no está disponible.");
   const lab = await ensureLabForUser(ownerId);
@@ -352,11 +401,32 @@ export async function resolveOperationPlan(ownerId: number, planId: number, deci
   const plan = selected[0];
   if (!plan || plan.labId !== lab.id) throw new Error("El plan no pertenece a este laboratorio.");
 
-  const persistence = buildPlanDecisionPersistence(plan.status, planId, ownerId, plan.title, decision);
+  const persistence = buildPlanDecisionPersistence(plan.status, planId, ownerId, plan.title, decision, decisionNote);
   await db
     .update(operationPlans)
     .set(persistence.planUpdate)
     .where(eq(operationPlans.id, planId));
   await appendAudit(lab.id, ownerId, persistence.audit.eventType, persistence.audit.message, persistence.audit.severity, persistence.audit.metadata);
   return { status: persistence.planUpdate.status, physicalExecution: physicalExecutionStatus() };
+}
+
+export async function createSimulationRun(ownerId: number, input: { scenario: SimulationScenario; durationHours: number; targetZone: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("La base de datos no está disponible.");
+  const lab = await ensureLabForUser(ownerId);
+  const projection = runSimulationProjection({ ...input, energyThresholdPct: Number(lab.energyThresholdPct) });
+  await db.insert(simulationRuns).values({
+    labId: lab.id,
+    createdBy: ownerId,
+    title: projection.title,
+    scenario: input.scenario,
+    targetZone: input.targetZone,
+    durationHours: input.durationHours,
+    assumptionsJson: JSON.stringify(projection.assumptions),
+    inputsJson: JSON.stringify(projection.inputs),
+    resultsJson: JSON.stringify(projection.result),
+    status: "completada",
+  });
+  await appendAudit(lab.id, ownerId, "simulation.completed", `Se completó una proyección de ${input.scenario} sin control físico.`, "info", { scenario: input.scenario, durationHours: input.durationHours, targetZone: input.targetZone, outcome: projection.result.outcome, physicalExecution: "disabled" });
+  return projection;
 }

@@ -10,7 +10,9 @@ import {
   createLabTask,
   createOperationPlan,
   createSimulatedDevice,
+  createSimulationRun,
   getLabDashboard,
+  getTelemetryHistory,
   registerBlockedPhysicalAttempt,
   resolveOperationPlan,
   updateLabConfiguration,
@@ -32,6 +34,9 @@ export const appRouter = router({
   }),
   lab: router({
     dashboard: protectedProcedure.query(({ ctx }) => getLabDashboard(ctx.user.id)),
+    telemetryHistory: protectedProcedure
+      .input(z.object({ metric: z.string().optional(), periodHours: z.union([z.literal(24), z.literal(72), z.literal(168)]).optional() }).optional())
+      .query(({ ctx, input }) => getTelemetryHistory(ctx.user.id, input?.metric, input?.periodHours ?? 24)),
     safetyStatus: protectedProcedure.query(() => physicalExecutionStatus()),
     recordBlockedPhysicalAttempt: protectedProcedure
       .input(z.object({ intent: z.string().min(3).max(500) }))
@@ -69,8 +74,11 @@ export const appRouter = router({
         return review;
       }),
     resolvePlan: protectedProcedure
-      .input(z.object({ planId: z.number().int().positive(), decision: z.enum(["aprobar", "rechazar"]) }))
-      .mutation(({ ctx, input }) => resolveOperationPlan(ctx.user.id, input.planId, input.decision)),
+      .input(z.object({ planId: z.number().int().positive(), decision: z.enum(["aprobar", "rechazar"]), decisionNote: z.string().min(3).max(1000) }))
+      .mutation(({ ctx, input }) => resolveOperationPlan(ctx.user.id, input.planId, input.decision, input.decisionNote)),
+    runSimulation: protectedProcedure
+      .input(z.object({ scenario: z.enum(["riego", "luz", "nutrientes", "energia"]), durationHours: z.number().int().min(1).max(72), targetZone: z.string().min(2).max(120) }))
+      .mutation(({ ctx, input }) => createSimulationRun(ctx.user.id, input)),
   }),
 });
 

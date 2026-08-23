@@ -67,6 +67,7 @@ export function buildPlanDecisionPersistence(
   actorId: number,
   planTitle: string,
   decision: "aprobar" | "rechazar",
+  decisionNote: string,
   now = new Date(),
 ) {
   const status = resolvePlanDecision(currentStatus, decision);
@@ -76,6 +77,9 @@ export function buildPlanDecisionPersistence(
       status,
       approvedBy: approved ? actorId : null,
       approvedAt: approved ? now : null,
+      decidedBy: actorId,
+      decidedAt: now,
+      decisionNote,
     },
     audit: {
       eventType: approved ? "plan.approved_for_simulation" : "plan.rejected",
@@ -83,7 +87,7 @@ export function buildPlanDecisionPersistence(
       message: approved
         ? `El plan fue aprobado exclusivamente para simulación: ${planTitle}`
         : `El plan fue rechazado y bloqueado: ${planTitle}`,
-      metadata: { planId, resultingStatus: status, physicalExecution: "disabled" },
+      metadata: { planId, resultingStatus: status, decisionNote, physicalExecution: "disabled" },
     },
   };
 }

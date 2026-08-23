@@ -129,6 +129,9 @@ export const operationPlans = mysqlTable("operationPlans", {
   approvalRequired: boolean("approvalRequired").default(true).notNull(),
   approvedBy: int("approvedBy"),
   approvedAt: timestamp("approvedAt"),
+  decidedBy: int("decidedBy"),
+  decidedAt: timestamp("decidedAt"),
+  decisionNote: text("decisionNote"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -141,6 +144,21 @@ export const auditLogs = mysqlTable("auditLogs", {
   severity: mysqlEnum("severity", ["info", "atencion", "critico"]).default("info").notNull(),
   message: text("message").notNull(),
   metadataJson: text("metadataJson"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const simulationRuns = mysqlTable("simulationRuns", {
+  id: int("id").autoincrement().primaryKey(),
+  labId: int("labId").notNull(),
+  createdBy: int("createdBy").notNull(),
+  title: varchar("title", { length: 180 }).notNull(),
+  scenario: mysqlEnum("scenario", ["riego", "luz", "nutrientes", "energia"]).notNull(),
+  targetZone: varchar("targetZone", { length: 120 }).notNull(),
+  durationHours: int("durationHours").notNull(),
+  assumptionsJson: text("assumptionsJson").notNull(),
+  inputsJson: text("inputsJson").notNull(),
+  resultsJson: text("resultsJson").notNull(),
+  status: mysqlEnum("status", ["completada", "bloqueada"]).default("completada").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -163,3 +181,4 @@ export type Lab = typeof labs.$inferSelect;
 export type Zone = typeof zones.$inferSelect;
 export type Device = typeof devices.$inferSelect;
 export type OperationPlan = typeof operationPlans.$inferSelect;
+export type SimulationRun = typeof simulationRuns.$inferSelect;

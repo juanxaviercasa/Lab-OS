@@ -41,12 +41,12 @@ describe("safeguardas de LabOS", () => {
 
   it("prepara la persistencia y la auditoría de una aprobación humana", () => {
     const now = new Date("2026-08-23T12:00:00.000Z");
-    const result = buildPlanDecisionPersistence("pendiente_aprobacion", 7, 42, "Plan de riego", "aprobar", now);
-    expect(result.planUpdate).toEqual({ status: "aprobado", approvedBy: 42, approvedAt: now });
+    const result = buildPlanDecisionPersistence("pendiente_aprobacion", 7, 42, "Plan de riego", "aprobar", "La evidencia está completa.", now);
+    expect(result.planUpdate).toEqual({ status: "aprobado", approvedBy: 42, approvedAt: now, decidedBy: 42, decidedAt: now, decisionNote: "La evidencia está completa." });
     expect(result.audit).toMatchObject({
       eventType: "plan.approved_for_simulation",
       severity: "info",
-      metadata: { planId: 7, resultingStatus: "aprobado", physicalExecution: "disabled" },
+      metadata: { planId: 7, resultingStatus: "aprobado", decisionNote: "La evidencia está completa.", physicalExecution: "disabled" },
     });
   });
 
