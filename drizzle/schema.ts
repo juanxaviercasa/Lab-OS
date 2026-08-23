@@ -216,6 +216,75 @@ export const labNotifications = mysqlTable("labNotifications", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+export const learningProfiles = mysqlTable("learningProfiles", {
+  id: int("id").autoincrement().primaryKey(),
+  labId: int("labId").notNull(),
+  ownerId: int("ownerId").notNull(),
+  displayName: varchar("displayName", { length: 120 }).notNull(),
+  preferredLanguage: varchar("preferredLanguage", { length: 12 }).notNull(),
+  targetLanguage: varchar("targetLanguage", { length: 12 }).notNull(),
+  proficiency: mysqlEnum("proficiency", ["inicial", "intermedio", "avanzado"]).default("inicial").notNull(),
+  learningGoal: text("learningGoal").notNull(),
+  pace: mysqlEnum("pace", ["pausado", "constante", "intensivo"]).default("constante").notNull(),
+  privacyAcknowledged: boolean("privacyAcknowledged").default(false).notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const voicePracticeSessions = mysqlTable("voicePracticeSessions", {
+  id: int("id").autoincrement().primaryKey(),
+  labId: int("labId").notNull(),
+  profileId: int("profileId").notNull(),
+  promptText: text("promptText").notNull(),
+  transcript: text("transcript").notNull(),
+  detectedLanguage: varchar("detectedLanguage", { length: 12 }),
+  audioStorageKey: varchar("audioStorageKey", { length: 360 }),
+  audioUrl: varchar("audioUrl", { length: 500 }),
+  status: mysqlEnum("status", ["borrador", "guardada"]).default("borrador").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const kitchenScenarios = mysqlTable("kitchenScenarios", {
+  id: int("id").autoincrement().primaryKey(),
+  labId: int("labId").notNull(),
+  name: varchar("name", { length: 180 }).notNull(),
+  culture: varchar("culture", { length: 100 }).notNull(),
+  durationMinutes: int("durationMinutes").notNull(),
+  ingredientsJson: text("ingredientsJson").notNull(),
+  stagesJson: text("stagesJson").notNull(),
+  riskLevel: mysqlEnum("riskLevel", ["bajo", "medio", "alto"]).default("bajo").notNull(),
+  safetyNotes: text("safetyNotes").notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const kitchenStations = mysqlTable("kitchenStations", {
+  id: int("id").autoincrement().primaryKey(),
+  labId: int("labId").notNull(),
+  name: varchar("name", { length: 120 }).notNull(),
+  type: mysqlEnum("type", ["despensa", "preparacion", "coccion", "seguridad"]).notNull(),
+  status: mysqlEnum("status", ["modelada", "aislada", "bloqueada", "activa"]).notNull(),
+  description: text("description").notNull(),
+  safetyMode: varchar("safetyMode", { length: 100 }).notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const voiceProviderConfigs = mysqlTable("voiceProviderConfigs", {
+  id: int("id").autoincrement().primaryKey(),
+  labId: int("labId").notNull(),
+  provider: varchar("provider", { length: 80 }).notNull(),
+  endpointPlaceholder: varchar("endpointPlaceholder", { length: 180 }).notNull(),
+  credentialPlaceholder: varchar("credentialPlaceholder", { length: 180 }).notNull(),
+  maxAudioMb: int("maxAudioMb").default(16).notNull(),
+  enabled: boolean("enabled").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export const integrationAdapters = mysqlTable("integrationAdapters", {
   id: int("id").autoincrement().primaryKey(),
   labId: int("labId").notNull(),
@@ -240,3 +309,8 @@ export type TelemetrySource = typeof telemetrySources.$inferSelect;
 export type InnovationInitiative = typeof innovationInitiatives.$inferSelect;
 export type RobotLearningModule = typeof robotLearningModules.$inferSelect;
 export type LabNotification = typeof labNotifications.$inferSelect;
+export type LearningProfile = typeof learningProfiles.$inferSelect;
+export type VoicePracticeSession = typeof voicePracticeSessions.$inferSelect;
+export type KitchenScenario = typeof kitchenScenarios.$inferSelect;
+export type KitchenStation = typeof kitchenStations.$inferSelect;
+export type VoiceProviderConfig = typeof voiceProviderConfigs.$inferSelect;

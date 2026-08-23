@@ -54,3 +54,19 @@
 - [x] Añadir pruebas de entrega de módulos educativos y notificaciones desde el panel de datos.
 - [x] Añadir una prueba de trayectorias basada en resultados de simulación consumibles por la interfaz.
 - [x] Mover y ejecutar la prueba de trayectorias en una ruta incluida por la batería de Vitest.
+- [x] Definir perfiles de aprendizaje personalizables con idioma, objetivo, nivel y límites de privacidad.
+- [x] Implementar una interfaz de voz preparada para transcripción con permisos explícitos y placeholders de servicio.
+- [x] Crear una vista detallada de cocina automatizada con estación, ingredientes, recetas y salvaguardas simuladas.
+- [x] Añadir un explorador interactivo de trayectorias de simulación y un flujo visual de datos.
+- [x] Añadir pruebas y verificación visual de perfiles, voz, cocina y exploradores.
+- [x] Guardar y sincronizar la ampliación validada de LabOS con GitHub.
+- [x] Preparar el flujo de voz con placeholder de proveedor, transcripción segura por backend y fallback local explícito.
+- [x] Persistir estaciones, recetas, ingredientes y salvaguardas de cocina simulada como datos configurables.
+- [x] Añadir pruebas de persistencia de perfiles, sesiones de voz, flujo de datos y escenarios de cocina.
+- [x] Añadir configuración persistente y placeholder explícito del proveedor de transcripción de voz.
+- [x] Persistir estaciones de cocina simulada y consumirlas en la vista de cocina.
+- [x] Añadir pruebas de persistencia de perfiles, prácticas de voz y entrega de datos de cocina en el dashboard.
+- [x] Añadir pruebas de inserción, auditoría y notificación para perfiles y prácticas de voz.
+- [x] Añadir una prueba del proveedor de transcripción y metadatos de audio autorizados.
+- [x] Verificar en pruebas la auditoría y notificación generadas al guardar una práctica de voz.
+- [x] Verificar en pruebas la activación y límite de audio del proveedor persistente de transcripción.

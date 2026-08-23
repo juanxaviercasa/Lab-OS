@@ -37,14 +37,24 @@ describe("persistencia de notificaciones y entrega de panel", () => {
     expect(fake.updates).toHaveLength(3);
   });
 
-  it("entrega módulos educativos y notificaciones persistidas en el dashboard", async () => {
+  it("entrega perfiles, voz, cocina, módulos y notificaciones persistidos en el dashboard", async () => {
     const telemetry = Array.from({ length: 28 }, (_, id) => ({ id, deviceId: 13, metric: "Humedad", unit: "%", value: "61", status: "normal", recordedAt: new Date() }));
     const modules = [{ id: 1, labId: 8, name: "Diálogo", capability: "Tutoría", mode: "dialogo", readiness: "prototipo", safetyBoundary: "Sin control físico.", progressPct: 62 }];
     const notifications = [{ id: 2, labId: 8, kind: "telemetria", severity: "info", title: "Lectura nueva", detail: "Humedad disponible", unread: true, createdAt: new Date() }];
-    const fake = createDb({ labs: [lab], devices: [device], sensorReadings: telemetry, telemetrySources: [{ id: 1, labId: 8 }], innovationInitiatives: [{ id: 1, labId: 8 }], robotLearningModules: modules, labNotifications: notifications, zones: [], labTasks: [], inventoryItems: [], experiments: [], operationPlans: [], auditLogs: [], integrationAdapters: [], simulationRuns: [] });
+    const profiles = [{ id: 3, labId: 8, ownerId: 42, displayName: "Perfil", privacyAcknowledged: true }];
+    const sessions = [{ id: 4, labId: 8, profileId: 3, transcript: "Hola", status: "guardada" }];
+    const scenarios = [{ id: 5, labId: 8, name: "Ensalada", active: true }];
+    const stations = [{ id: 6, labId: 8, name: "Cocción", type: "coccion", status: "bloqueada", active: true }];
+    const providers = [{ id: 7, labId: 8, provider: "Transcripción integrada", enabled: true, maxAudioMb: 16 }];
+    const fake = createDb({ labs: [lab], devices: [device], sensorReadings: telemetry, telemetrySources: [{ id: 1, labId: 8 }], innovationInitiatives: [{ id: 1, labId: 8 }], robotLearningModules: modules, labNotifications: notifications, learningProfiles: profiles, voicePracticeSessions: sessions, kitchenScenarios: scenarios, kitchenStations: stations, voiceProviderConfigs: providers, zones: [], labTasks: [], inventoryItems: [], experiments: [], operationPlans: [], auditLogs: [], integrationAdapters: [], simulationRuns: [] });
     __setDbForTesting(fake.db);
     const dashboard = await getLabDashboard(42);
     expect(dashboard.robotLearningModules).toEqual(modules);
     expect(dashboard.notifications).toEqual(notifications);
+    expect(dashboard.learningProfiles).toEqual(profiles);
+    expect(dashboard.voiceSessions).toEqual(sessions);
+    expect(dashboard.kitchenScenarios).toEqual(scenarios);
+    expect(dashboard.kitchenStations).toEqual(stations);
+    expect(dashboard.voiceProviderConfigs).toEqual(providers);
   });
 });

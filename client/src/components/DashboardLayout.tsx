@@ -29,6 +29,7 @@ import {
   Boxes,
   ClipboardCheck,
   ChartNoAxesCombined,
+  CookingPot,
   Radio,
   FlaskConical,
   LayoutDashboard,
@@ -49,6 +50,7 @@ const menuItems = [
   { icon: FlaskConical, label: "Experimentos", path: "/experimentos" },
   { icon: Boxes, label: "Proyectos", path: "/proyectos" },
   { icon: Atom, label: "Cerebro robótico", path: "/cerebro-robotico" },
+  { icon: CookingPot, label: "Cocina automatizada", path: "/cocina" },
   { icon: Network, label: "Adaptadores", path: "/adaptadores" },
   { icon: Settings2, label: "Configuración", path: "/configuracion" },
 ];

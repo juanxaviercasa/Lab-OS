@@ -7,7 +7,10 @@ import {
   integrationAdapters,
   innovationInitiatives,
   inventoryItems,
+  kitchenScenarios,
+  kitchenStations,
   labNotifications,
+  learningProfiles,
   labs,
   labTasks,
   operationPlans,
@@ -17,6 +20,8 @@ import {
   telemetrySources,
   type InsertUser,
   users,
+  voicePracticeSessions,
+  voiceProviderConfigs,
   zones,
 } from "../drizzle/schema";
 import { buildBlockedPhysicalAttemptAudit, buildPlanDecisionPersistence, physicalExecutionStatus } from "./labSafety";
@@ -26,6 +31,9 @@ import { normalizeTelemetryPayload, validatePublicTelemetryUrl } from "./labTele
 import { getDefaultInitiatives } from "./labPortfolio";
 import { blockedPhysicalNotification, planDecisionNotification } from "./labNotifications";
 import { getDefaultRobotLearningModules } from "./robotLearning";
+import { getDefaultKitchenScenarios } from "./kitchenSimulation";
+import { storagePut } from "./storage";
+import { transcribeAudio } from "./_core/voiceTranscription";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -130,14 +138,18 @@ async function ensureHistoricalTelemetry(labId: number, deviceIds: number[]) {
   await appendAudit(labId, null, "telemetry.history_seeded", "Se inicializaron series históricas simuladas para el panel analítico.", "info", { samples: rows.length });
 }
 
-async function ensureLabCatalog(labId: number) {
+async function ensureLabCatalog(labId: number, ownerId?: number) {
   const db = await getDb();
   if (!db) return;
-  const [sources, initiatives, learningModules, notifications] = await Promise.all([
+  const [sources, initiatives, learningModules, notifications, profiles, kitchenRows, stationRows, voiceProviderRows] = await Promise.all([
     db.select().from(telemetrySources).where(eq(telemetrySources.labId, labId)).limit(1),
     db.select().from(innovationInitiatives).where(eq(innovationInitiatives.labId, labId)).limit(1),
     db.select().from(robotLearningModules).where(eq(robotLearningModules.labId, labId)).limit(1),
     db.select().from(labNotifications).where(eq(labNotifications.labId, labId)).limit(1),
+    db.select().from(learningProfiles).where(eq(learningProfiles.labId, labId)).limit(1),
+    db.select().from(kitchenScenarios).where(eq(kitchenScenarios.labId, labId)).limit(1),
+    db.select().from(kitchenStations).where(eq(kitchenStations.labId, labId)).limit(1),
+    db.select().from(voiceProviderConfigs).where(eq(voiceProviderConfigs.labId, labId)).limit(1),
   ]);
   if (!sources.length) {
     await db.insert(telemetrySources).values({ labId, name: "Fuente HTTP de telemetría · Placeholder", kind: "http_json", endpointUrl: "https://telemetry.example.invalid/readings", authMode: "none", credentialReference: null, status: "preparada", schemaJson: JSON.stringify({ expected: "{ readings: [{ metric, value, unit, status? }] }", mode: "solo_lectura", commands: "disabled" }) });
@@ -149,6 +161,15 @@ async function ensureLabCatalog(labId: number) {
     await db.insert(robotLearningModules).values(getDefaultRobotLearningModules().map((module) => ({ labId, ...module })));
   }
   if (!notifications.length) await createLabNotification(labId, "sistema", "info", "Centro de notificaciones listo", "LabOS avisará sobre lecturas nuevas, resultados de simulación y eventos de seguridad.");
+  if (!profiles.length && ownerId) await db.insert(learningProfiles).values({ labId, ownerId, displayName: "Perfil de aprendizaje · Placeholder", preferredLanguage: "es", targetLanguage: "en", proficiency: "inicial", learningGoal: "Definir objetivo de práctica e idioma meta.", pace: "constante", privacyAcknowledged: false, active: true });
+  if (!kitchenRows.length) await db.insert(kitchenScenarios).values(getDefaultKitchenScenarios().map((scenario) => ({ labId, ...scenario })));
+  if (!stationRows.length) await db.insert(kitchenStations).values([
+    { labId, name: "Despensa", type: "despensa", status: "modelada", description: "Inventario digital de ingredientes y alérgenos.", safetyMode: "sin_dispensado", active: true },
+    { labId, name: "Preparación", type: "preparacion", status: "aislada", description: "Orden de mise en place y porciones en el gemelo digital.", safetyMode: "sin_corte", active: true },
+    { labId, name: "Cocción", type: "coccion", status: "bloqueada", description: "Proyección térmica sin conexión a calor, gas o inducción.", safetyMode: "sin_calor", active: true },
+    { labId, name: "Seguridad", type: "seguridad", status: "activa", description: "Verificación de dieta, alergias y límites de simulación.", safetyMode: "revision_humana", active: true },
+  ]);
+  if (!voiceProviderRows.length) await db.insert(voiceProviderConfigs).values({ labId, provider: "Transcripción integrada · Placeholder", endpointPlaceholder: "BUILT_IN_FORGE_API_URL", credentialPlaceholder: "BUILT_IN_FORGE_API_KEY", maxAudioMb: 16, enabled: true });
 }
 
 export async function ensureLabForUser(ownerId: number) {
@@ -325,12 +346,12 @@ export async function getLabDashboard(ownerId: number) {
   const db = await getDb();
   if (!db) throw new Error("La base de datos no está disponible.");
   const lab = await ensureLabForUser(ownerId);
-  await ensureLabCatalog(lab.id);
+  await ensureLabCatalog(lab.id, ownerId);
   const deviceRows = await db.select().from(devices).where(eq(devices.labId, lab.id));
   const sensorDeviceIds = deviceRows.filter((item) => item.type === "sensor").map((item) => item.id);
   await ensureHistoricalTelemetry(lab.id, sensorDeviceIds);
   const deviceIds = deviceRows.map((item) => item.id);
-  const [zoneRows, readingRows, taskRows, inventoryRows, experimentRows, planRows, auditRows, adapterRows, simulationRows, sourceRows, initiativeRows, moduleRows, notificationRows] = await Promise.all([
+  const [zoneRows, readingRows, taskRows, inventoryRows, experimentRows, planRows, auditRows, adapterRows, simulationRows, sourceRows, initiativeRows, moduleRows, notificationRows, profileRows, voiceRows, kitchenScenarioRows, kitchenStationRows, voiceProviderConfigRows] = await Promise.all([
     db.select().from(zones).where(eq(zones.labId, lab.id)),
     deviceIds.length ? db.select().from(sensorReadings).where(inArray(sensorReadings.deviceId, deviceIds)).orderBy(desc(sensorReadings.recordedAt)).limit(16) : Promise.resolve([]),
     db.select().from(labTasks).where(eq(labTasks.labId, lab.id)).orderBy(desc(labTasks.updatedAt)),
@@ -344,9 +365,14 @@ export async function getLabDashboard(ownerId: number) {
     db.select().from(innovationInitiatives).where(eq(innovationInitiatives.labId, lab.id)).orderBy(desc(innovationInitiatives.updatedAt)),
     db.select().from(robotLearningModules).where(eq(robotLearningModules.labId, lab.id)).orderBy(desc(robotLearningModules.progressPct)),
     db.select().from(labNotifications).where(eq(labNotifications.labId, lab.id)).orderBy(desc(labNotifications.createdAt)).limit(24),
+    db.select().from(learningProfiles).where(eq(learningProfiles.labId, lab.id)).orderBy(desc(learningProfiles.updatedAt)),
+    db.select().from(voicePracticeSessions).where(eq(voicePracticeSessions.labId, lab.id)).orderBy(desc(voicePracticeSessions.createdAt)).limit(12),
+    db.select().from(kitchenScenarios).where(eq(kitchenScenarios.labId, lab.id)).orderBy(desc(kitchenScenarios.updatedAt)),
+    db.select().from(kitchenStations).where(eq(kitchenStations.labId, lab.id)).orderBy(desc(kitchenStations.updatedAt)),
+    db.select().from(voiceProviderConfigs).where(eq(voiceProviderConfigs.labId, lab.id)).orderBy(desc(voiceProviderConfigs.updatedAt)),
   ]);
 
-  return { lab, zones: zoneRows, devices: deviceRows, readings: readingRows, tasks: taskRows, inventory: inventoryRows, experiments: experimentRows, plans: planRows, audit: auditRows, adapters: adapterRows, simulations: simulationRows, telemetrySources: sourceRows, initiatives: initiativeRows, robotLearningModules: moduleRows, notifications: notificationRows };
+  return { lab, zones: zoneRows, devices: deviceRows, readings: readingRows, tasks: taskRows, inventory: inventoryRows, experiments: experimentRows, plans: planRows, audit: auditRows, adapters: adapterRows, simulations: simulationRows, telemetrySources: sourceRows, initiatives: initiativeRows, robotLearningModules: moduleRows, notifications: notificationRows, learningProfiles: profileRows, voiceSessions: voiceRows, kitchenScenarios: kitchenScenarioRows, kitchenStations: kitchenStationRows, voiceProviderConfigs: voiceProviderConfigRows };
 }
 
 export async function getTelemetryHistory(ownerId: number, metric?: string, periodHours = 24) {
@@ -520,4 +546,44 @@ export async function markNotificationsRead(ownerId: number, notificationIds?: n
   if (!accepted.length) return { updated: 0 };
   await Promise.all(accepted.map((item) => db.update(labNotifications).set({ unread: false }).where(eq(labNotifications.id, item.id))));
   return { updated: accepted.length };
+}
+
+export async function createLearningProfile(ownerId: number, input: { displayName: string; preferredLanguage: string; targetLanguage: string; proficiency: "inicial" | "intermedio" | "avanzado"; learningGoal: string; pace: "pausado" | "constante" | "intensivo"; privacyAcknowledged: boolean }) {
+  const db = await getDb();
+  if (!db) throw new Error("La base de datos no está disponible.");
+  if (!input.privacyAcknowledged) throw new Error("Debes confirmar el límite de privacidad antes de guardar un perfil.");
+  const lab = await ensureLabForUser(ownerId);
+  await db.insert(learningProfiles).values({ labId: lab.id, ownerId, ...input, active: true });
+  await appendAudit(lab.id, ownerId, "learning.profile_created", `Se creó el perfil de aprendizaje: ${input.displayName}.`, "info", { targetLanguage: input.targetLanguage, physicalExecution: "disabled" });
+  await createLabNotification(lab.id, "sistema", "info", "Perfil de aprendizaje creado", `${input.displayName} quedó listo para práctica guiada con consentimiento explícito.`);
+}
+
+export async function saveVoicePractice(ownerId: number, input: { profileId: number; promptText: string; transcript: string; detectedLanguage?: string; audioStorageKey?: string; audioUrl?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("La base de datos no está disponible.");
+  const lab = await ensureLabForUser(ownerId);
+  const profile = (await db.select().from(learningProfiles).where(eq(learningProfiles.id, input.profileId)).limit(1))[0];
+  if (!profile || profile.labId !== lab.id || !profile.privacyAcknowledged) throw new Error("El perfil no está autorizado para guardar práctica de voz.");
+  await db.insert(voicePracticeSessions).values({ labId: lab.id, profileId: input.profileId, promptText: input.promptText, transcript: input.transcript, detectedLanguage: input.detectedLanguage ?? null, audioStorageKey: input.audioStorageKey ?? null, audioUrl: input.audioUrl ?? null, status: "guardada" });
+  await appendAudit(lab.id, ownerId, "learning.voice_saved", "Se guardó una práctica de voz con consentimiento del perfil.", "info", { profileId: input.profileId, physicalExecution: "disabled" });
+  await createLabNotification(lab.id, "sistema", "info", "Práctica de voz guardada", "La transcripción se añadió al historial del perfil autorizado.");
+}
+
+export async function transcribeVoiceAudio(ownerId: number, input: { profileId: number; promptText: string; audioBase64: string; mimeType: string; language?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("La base de datos no está disponible.");
+  const lab = await ensureLabForUser(ownerId);
+  const profile = (await db.select().from(learningProfiles).where(eq(learningProfiles.id, input.profileId)).limit(1))[0];
+  const provider = (await db.select().from(voiceProviderConfigs).where(eq(voiceProviderConfigs.labId, lab.id)).limit(1))[0];
+  if (!profile || profile.labId !== lab.id || !profile.privacyAcknowledged) throw new Error("El perfil no está autorizado para transcribir audio.");
+  if (!provider || !provider.enabled) throw new Error("El proveedor de transcripción no está habilitado para este laboratorio.");
+  if (!input.mimeType.startsWith("audio/")) throw new Error("Solo se aceptan archivos de audio para transcripción.");
+  const bytes = Buffer.from(input.audioBase64, "base64");
+  if (!bytes.length || bytes.length > provider.maxAudioMb * 1024 * 1024) throw new Error(`El audio debe tener un tamaño entre 1 byte y ${provider.maxAudioMb} MB.`);
+  const extension = input.mimeType.includes("ogg") ? "ogg" : input.mimeType.includes("mpeg") ? "mp3" : input.mimeType.includes("wav") ? "wav" : "webm";
+  const stored = await storagePut(`voice-practice/${ownerId}/${Date.now()}.${extension}`, bytes, input.mimeType);
+  const result = await transcribeAudio({ audioUrl: stored.url, language: input.language, prompt: input.promptText });
+  if ("error" in result) throw new Error(result.error);
+  await appendAudit(lab.id, ownerId, "learning.voice_transcribed", "Se transcribió un audio de práctica en un perfil autorizado.", "info", { profileId: input.profileId, storageKey: stored.key, provider: provider.provider, physicalExecution: "disabled" });
+  return { transcript: result.text, detectedLanguage: result.language ?? input.language ?? null, audioStorageKey: stored.key, audioUrl: stored.url };
 }

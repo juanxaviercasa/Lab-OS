@@ -43,6 +43,27 @@
       "when": 1787507792805,
       "tag": "0005_panoramic_puppet_master",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1787508492089,
+      "tag": "0006_late_sebastian_shaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1787508795602,
+      "tag": "0007_melted_magma",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1787509111325,
+      "tag": "0008_busy_the_executioner",
+      "breakpoints": true
     }
   ]
 }

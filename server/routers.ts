@@ -8,6 +8,7 @@ import {
   createExperiment,
   createInventoryItem,
   createLabTask,
+  createLearningProfile,
   createOperationPlan,
   createSimulatedDevice,
   createSimulationRun,
@@ -18,6 +19,8 @@ import {
   previewTelemetrySource,
   registerBlockedPhysicalAttempt,
   resolveOperationPlan,
+  saveVoicePractice,
+  transcribeVoiceAudio,
   updateLabConfiguration,
 } from "./db";
 import { physicalExecutionStatus, reviewSimulatedPlan } from "./labSafety";
@@ -91,6 +94,15 @@ export const appRouter = router({
     markNotificationsRead: protectedProcedure
       .input(z.object({ notificationIds: z.array(z.number().int().positive()).max(24).optional() }).optional())
       .mutation(({ ctx, input }) => markNotificationsRead(ctx.user.id, input?.notificationIds)),
+    createLearningProfile: protectedProcedure
+      .input(z.object({ displayName: z.string().min(2).max(120), preferredLanguage: z.string().min(2).max(12), targetLanguage: z.string().min(2).max(12), proficiency: z.enum(["inicial", "intermedio", "avanzado"]), learningGoal: z.string().min(8).max(1200), pace: z.enum(["pausado", "constante", "intensivo"]), privacyAcknowledged: z.literal(true) }))
+      .mutation(({ ctx, input }) => createLearningProfile(ctx.user.id, input)),
+    saveVoicePractice: protectedProcedure
+      .input(z.object({ profileId: z.number().int().positive(), promptText: z.string().min(3).max(1000), transcript: z.string().min(1).max(5000), detectedLanguage: z.string().min(2).max(12).optional(), audioStorageKey: z.string().max(360).optional(), audioUrl: z.string().max(500).optional() }))
+      .mutation(({ ctx, input }) => saveVoicePractice(ctx.user.id, input)),
+    transcribeVoiceAudio: protectedProcedure
+      .input(z.object({ profileId: z.number().int().positive(), promptText: z.string().min(3).max(1000), audioBase64: z.string().min(4).max(23_000_000), mimeType: z.string().regex(/^audio\/(webm|mpeg|wav|ogg|mp4)$/), language: z.string().min(2).max(12).optional() }))
+      .mutation(({ ctx, input }) => transcribeVoiceAudio(ctx.user.id, input)),
   }),
 });
 

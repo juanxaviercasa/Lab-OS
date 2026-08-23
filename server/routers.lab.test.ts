@@ -5,6 +5,7 @@ vi.mock("./db", () => ({
   createExperiment: vi.fn(),
   createInventoryItem: vi.fn(),
   createLabTask: vi.fn(),
+  createLearningProfile: vi.fn(),
   createOperationPlan: vi.fn(),
   createSimulatedDevice: vi.fn(),
   createTelemetrySource: vi.fn(),
@@ -14,10 +15,12 @@ vi.mock("./db", () => ({
   previewTelemetrySource: vi.fn(),
   registerBlockedPhysicalAttempt: vi.fn(),
   resolveOperationPlan: vi.fn(),
+  saveVoicePractice: vi.fn(),
+  transcribeVoiceAudio: vi.fn(),
   updateLabConfiguration: vi.fn(),
 }));
 
-import { createOperationPlan, createTelemetrySource, getTelemetryHistory, markNotificationsRead, previewTelemetrySource, registerBlockedPhysicalAttempt, resolveOperationPlan } from "./db";
+import { createLearningProfile, createOperationPlan, createTelemetrySource, getTelemetryHistory, markNotificationsRead, previewTelemetrySource, registerBlockedPhysicalAttempt, resolveOperationPlan, saveVoicePractice, transcribeVoiceAudio } from "./db";
 import { appRouter } from "./routers";
 
 const user = {
@@ -127,5 +130,24 @@ describe("procedimientos de LabOS", () => {
     const result = await caller.lab.markNotificationsRead({ notificationIds: [3, 4] });
     expect(markNotificationsRead).toHaveBeenCalledWith(user.id, [3, 4]);
     expect(result).toEqual({ updated: 2 });
+  });
+
+  it("crea un perfil con consentimiento y guarda una práctica de voz revisada", async () => {
+    vi.mocked(createLearningProfile).mockResolvedValue(undefined);
+    vi.mocked(saveVoicePractice).mockResolvedValue(undefined);
+    const caller = appRouter.createCaller(createContext());
+    const profile = { displayName: "Perfil inglés", preferredLanguage: "es", targetLanguage: "en", proficiency: "inicial" as const, learningGoal: "Conversación cotidiana.", pace: "constante" as const, privacyAcknowledged: true as const };
+    await caller.lab.createLearningProfile(profile);
+    await caller.lab.saveVoicePractice({ profileId: 4, promptText: "Preséntate.", transcript: "Hello, I am learning English.", detectedLanguage: "en" });
+    expect(createLearningProfile).toHaveBeenCalledWith(user.id, profile);
+    expect(saveVoicePractice).toHaveBeenCalledWith(user.id, { profileId: 4, promptText: "Preséntate.", transcript: "Hello, I am learning English.", detectedLanguage: "en" });
+  });
+
+  it("delega audio autorizado al proveedor de transcripción seguro", async () => {
+    vi.mocked(transcribeVoiceAudio).mockResolvedValue({ transcript: "Hola", detectedLanguage: "es", audioStorageKey: "voice/practice.webm", audioUrl: "/manus-storage/voice/practice.webm" });
+    const caller = appRouter.createCaller(createContext());
+    const result = await caller.lab.transcribeVoiceAudio({ profileId: 4, promptText: "Saluda.", audioBase64: "YWJjZA==", mimeType: "audio/webm", language: "es" });
+    expect(transcribeVoiceAudio).toHaveBeenCalledWith(user.id, { profileId: 4, promptText: "Saluda.", audioBase64: "YWJjZA==", mimeType: "audio/webm", language: "es" });
+    expect(result).toMatchObject({ transcript: "Hola", detectedLanguage: "es" });
   });
 });
