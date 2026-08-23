@@ -82,7 +82,7 @@
 - [x] Modelar escenarios comprobables del autómata de limpieza con métricas de agua, energía, residuos, reciclaje y barreras de seguridad.
 - [x] Construir paneles para configurar, revisar y comparar fuentes HTTPS, aprobaciones clínicas y escenarios de limpieza simulados.
 - [x] Añadir cobertura Vitest y verificación visual de los nuevos flujos sin habilitar control físico.
-- [ ] Guardar y sincronizar la ampliación validada de telemetría, aprobación y limpieza con GitHub.
+- [x] Guardar y sincronizar la ampliación validada de telemetría, aprobación y limpieza con GitHub.
 - [x] Añadir una comparación lado a lado de escenarios de limpieza con diferencias de métricas y veredictos de simulación.
 - [x] Añadir pruebas de persistencia y entrega del panel para comprobaciones HTTPS, decisiones clínicas y escenarios de limpieza.
 - [x] Añadir una comparación lado a lado de fuentes HTTPS usando su última comprobación, lecturas y veredicto seguro.
