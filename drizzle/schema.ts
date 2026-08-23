@@ -336,6 +336,7 @@ export const cleaningScenarios = mysqlTable("cleaningScenarios", {
   taskType: mysqlEnum("taskType", ["vajilla", "superficies", "encerado", "vehiculo", "residuos_reciclaje"]).notNull(),
   riskLevel: mysqlEnum("riskLevel", ["bajo", "medio", "alto"]).default("bajo").notNull(),
   metricsJson: text("metricsJson").notNull(),
+  thresholdsJson: text("thresholdsJson"),
   safeguardsJson: text("safeguardsJson").notNull(),
   verificationJson: text("verificationJson"),
   status: mysqlEnum("status", ["borrador", "evaluado", "requiere_revision", "bloqueado"]).default("borrador").notNull(),

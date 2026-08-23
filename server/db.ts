@@ -37,7 +37,7 @@ import { blockedPhysicalNotification, planDecisionNotification } from "./labNoti
 import { getDefaultRobotLearningModules } from "./robotLearning";
 import { getDefaultKitchenScenarios } from "./kitchenSimulation";
 import { clinicalRecordCanBeApproved, getDefaultClinicalApprovalTemplates } from "./clinicalApprovals";
-import { getDefaultCleaningScenarios, verifyCleaningScenario } from "./cleaningSimulation";
+import { defaultCleaningThresholds, getDefaultCleaningScenarios, verifyCleaningScenario, type CleaningThresholds } from "./cleaningSimulation";
 import { storagePut } from "./storage";
 import { transcribeAudio } from "./_core/voiceTranscription";
 
@@ -181,9 +181,20 @@ async function ensureLabCatalog(labId: number, ownerId?: number) {
   ]);
   if (!voiceProviderRows.length) await db.insert(voiceProviderConfigs).values({ labId, provider: "Transcripción integrada · Placeholder", endpointPlaceholder: "BUILT_IN_FORGE_API_URL", credentialPlaceholder: "BUILT_IN_FORGE_API_KEY", maxAudioMb: 16, enabled: true });
   if (!clinicalTemplateRows.length) await db.insert(clinicalApprovalTemplates).values(getDefaultClinicalApprovalTemplates().map((template) => ({ labId, name: template.name, scope: template.scope, version: template.version, status: template.status, requiredRolesJson: JSON.stringify(template.requiredRoles), checklistJson: JSON.stringify(template.checklist), consentStatement: template.consentStatement, safetyBoundary: template.safetyBoundary, active: true })));
+  const templatesForDrafts = await db.select().from(clinicalApprovalTemplates).where(eq(clinicalApprovalTemplates.labId, labId));
+  const clinicalRecordsForDrafts = await db.select().from(clinicalApprovalRecords).where(eq(clinicalApprovalRecords.labId, labId));
+  if (templatesForDrafts.length >= 2) {
+    const draftDefinitions = [
+      { labId, templateId: templatesForDrafts[0].id, scenarioTitle: "Borrador · movilidad guiada en gemelo digital", reviewerRole: "Pendiente de asignación", reviewerName: "Sin revisor asignado", evidenceJson: JSON.stringify(["Completar necesidad funcional", "Completar análisis de riesgos", "Confirmar consentimiento informado"]), consentConfirmed: false, decision: "pendiente" as const, decisionNote: "Borrador no autorizado. Requiere revisor identificado, consentimiento confirmado y decisión humana." },
+      { labId, templateId: templatesForDrafts[1].id, scenarioTitle: "Borrador · cama y transferencias en gemelo digital", reviewerRole: "Pendiente de asignación", reviewerName: "Sin revisor asignado", evidenceJson: JSON.stringify(["Completar objetivo de confort", "Completar límites de simulación", "Confirmar consentimiento informado"]), consentConfirmed: false, decision: "pendiente" as const, decisionNote: "Borrador no autorizado. Requiere revisor identificado, consentimiento confirmado y decisión humana." },
+    ];
+    const existingDraftTitles = new Set(clinicalRecordsForDrafts.filter((record) => record.decision === "pendiente" && record.reviewerName === "Sin revisor asignado").map((record) => record.scenarioTitle));
+    const missingDrafts = draftDefinitions.filter((draft) => !existingDraftTitles.has(draft.scenarioTitle));
+    if (missingDrafts.length) await db.insert(clinicalApprovalRecords).values(missingDrafts);
+  }
   if (!cleaningRows.length) await db.insert(cleaningScenarios).values(getDefaultCleaningScenarios().map((scenario) => {
-    const verification = verifyCleaningScenario(scenario.metrics, scenario.riskLevel);
-    return { labId, name: scenario.name, area: scenario.area, taskType: scenario.taskType, riskLevel: scenario.riskLevel, metricsJson: JSON.stringify(scenario.metrics), safeguardsJson: JSON.stringify(scenario.safeguards), verificationJson: JSON.stringify(verification), status: verification.state === "verificado" ? "evaluado" as const : "requiere_revision" as const };
+    const verification = verifyCleaningScenario(scenario.metrics, scenario.riskLevel, scenario.thresholds);
+    return { labId, name: scenario.name, area: scenario.area, taskType: scenario.taskType, riskLevel: scenario.riskLevel, metricsJson: JSON.stringify(scenario.metrics), thresholdsJson: JSON.stringify(scenario.thresholds), safeguardsJson: JSON.stringify(scenario.safeguards), verificationJson: JSON.stringify(verification), status: verification.state === "verificado" ? "evaluado" as const : "requiere_revision" as const };
   }));
 }
 
@@ -609,12 +620,31 @@ export async function evaluateCleaningScenario(ownerId: number, scenarioId: numb
   if (!scenario || scenario.labId !== lab.id) throw new Error("El escenario de limpieza no pertenece a este laboratorio.");
   let metrics: { waterLiters: number; energyKwh: number; wasteKg: number; recyclingKg: number; exposureMinutes: number };
   try { metrics = JSON.parse(scenario.metricsJson); } catch { throw new Error("Las métricas del escenario no se pueden verificar."); }
-  const verification = verifyCleaningScenario(metrics, scenario.riskLevel);
+  let thresholds: CleaningThresholds = defaultCleaningThresholds;
+  try { if (scenario.thresholdsJson) thresholds = { ...defaultCleaningThresholds, ...JSON.parse(scenario.thresholdsJson) }; } catch { thresholds = defaultCleaningThresholds; }
+  const verification = verifyCleaningScenario(metrics, scenario.riskLevel, thresholds);
   const status = verification.state === "verificado" ? "evaluado" as const : "requiere_revision" as const;
   await db.update(cleaningScenarios).set({ verificationJson: JSON.stringify(verification), status }).where(eq(cleaningScenarios.id, scenario.id));
   await appendAudit(lab.id, ownerId, "cleaning.scenario_evaluated", `Se verificó el escenario de limpieza: ${scenario.name}.`, verification.state === "verificado" ? "info" : "atencion", { scenarioId, status, physicalExecution: "disabled" });
   await createLabNotification(lab.id, "simulacion", verification.state === "verificado" ? "info" : "atencion", "Escenario de limpieza verificado", `${scenario.name}: ${verification.state.replace("_", " ")}. Ninguna acción física fue habilitada.`);
   return verification;
+}
+
+export async function updateCleaningThresholds(ownerId: number, scenarioId: number, input: CleaningThresholds) {
+  const db = await getDb();
+  if (!db) throw new Error("La base de datos no está disponible.");
+  if (!Object.values(input).every((value) => Number.isFinite(value) && value >= 0)) throw new Error("Los umbrales deben ser valores numéricos no negativos.");
+  const lab = await ensureLabForUser(ownerId);
+  const scenario = (await db.select().from(cleaningScenarios).where(eq(cleaningScenarios.id, scenarioId)).limit(1))[0];
+  if (!scenario || scenario.labId !== lab.id) throw new Error("El escenario de limpieza no pertenece a este laboratorio.");
+  let metrics: { waterLiters: number; energyKwh: number; wasteKg: number; recyclingKg: number; exposureMinutes: number };
+  try { metrics = JSON.parse(scenario.metricsJson); } catch { throw new Error("Las métricas del escenario no se pueden verificar."); }
+  const verification = verifyCleaningScenario(metrics, scenario.riskLevel, input);
+  const status = verification.state === "verificado" ? "evaluado" as const : "requiere_revision" as const;
+  await db.update(cleaningScenarios).set({ thresholdsJson: JSON.stringify(input), verificationJson: JSON.stringify(verification), status }).where(eq(cleaningScenarios.id, scenario.id));
+  await appendAudit(lab.id, ownerId, "cleaning.thresholds_updated", `Se actualizaron los umbrales simulados de ${scenario.name}.`, "info", { scenarioId, thresholds: input, status, physicalExecution: "disabled" });
+  await createLabNotification(lab.id, "simulacion", verification.state === "verificado" ? "info" : "atencion", "Umbrales de limpieza actualizados", `${scenario.name} se recalculó sin activar agua, energía, químicos ni equipos.`);
+  return { verification, thresholds: input, physicalExecution: "disabled" as const };
 }
 
 export async function markNotificationsRead(ownerId: number, notificationIds?: number[]) {

@@ -1,0 +1,1 @@
+ALTER TABLE `cleaningScenarios` ADD `thresholdsJson` text;

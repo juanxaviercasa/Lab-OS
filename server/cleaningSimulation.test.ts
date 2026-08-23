@@ -14,4 +14,11 @@ describe("escenarios de limpieza simulada", () => {
     expect(result.state).toBe("requiere_revision");
     expect(result.checks.some((check) => !check.passed)).toBe(true);
   });
+
+  it("recalcula el veredicto con umbrales personalizados de agua, energía y reciclaje", () => {
+    const result = verifyCleaningScenario({ waterLiters: 14, energyKwh: 0.55, wasteKg: 0.08, recyclingKg: 0.18, exposureMinutes: 18 }, "medio", { maxWaterLiters: 10, maxEnergyKwh: 0.4, minRecyclingKg: 0.3 });
+    expect(result.state).toBe("requiere_revision");
+    expect(result.checks.find((check) => check.label === "Meta de reciclaje")?.passed).toBe(false);
+    expect(result.checks.find((check) => check.label === "Uso de recursos")?.passed).toBe(false);
+  });
 });

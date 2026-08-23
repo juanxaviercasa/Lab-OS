@@ -89,3 +89,10 @@
 - [x] Verificar en Vitest la persistencia de comprobaciones HTTPS en éxito y fallo controlado.
 - [x] Añadir una comparación lado a lado de aprobaciones clínicas que muestre alcance, consentimiento, evidencia, decisión y límite de seguridad.
 - [x] Añadir una comparación lado a lado de registros clínicos reales que muestre escenario, consentimiento, evidencia, decisión, nota y límite de seguridad.
+- [x] Añadir un asistente de configuración para registrar una fuente HTTPS real de solo lectura con contrato, validación y prueba manual.
+- [x] Preparar dos borradores de revisión clínica sin aprobación ni identidad ficticia, listos para completar por un revisor autorizado.
+- [x] Incorporar umbrales configurables de agua, energía y reciclaje por escenario de limpieza, con veredictos recalculables.
+- [x] Añadir pruebas Vitest y verificación visual de la nueva configuración segura.
+- [ ] Guardar y sincronizar la ampliación de fuente, borradores clínicos y umbrales con GitHub.
+- [x] Completar de forma idempotente los borradores clínicos faltantes cuando ya existan registros reales o pendientes.
+- [x] Añadir una prueba Vitest para el caso de un registro clínico existente y un borrador faltante.

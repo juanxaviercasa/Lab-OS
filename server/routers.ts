@@ -24,6 +24,7 @@ import {
   saveVoicePractice,
   transcribeVoiceAudio,
   updateLabConfiguration,
+  updateCleaningThresholds,
 } from "./db";
 import { physicalExecutionStatus, reviewSimulatedPlan } from "./labSafety";
 
@@ -99,6 +100,9 @@ export const appRouter = router({
     evaluateCleaningScenario: protectedProcedure
       .input(z.object({ scenarioId: z.number().int().positive() }))
       .mutation(({ ctx, input }) => evaluateCleaningScenario(ctx.user.id, input.scenarioId)),
+    updateCleaningThresholds: protectedProcedure
+      .input(z.object({ scenarioId: z.number().int().positive(), maxWaterLiters: z.number().min(0).max(10_000), maxEnergyKwh: z.number().min(0).max(1_000), minRecyclingKg: z.number().min(0).max(10_000) }))
+      .mutation(({ ctx, input }) => updateCleaningThresholds(ctx.user.id, input.scenarioId, { maxWaterLiters: input.maxWaterLiters, maxEnergyKwh: input.maxEnergyKwh, minRecyclingKg: input.minRecyclingKg })),
     markNotificationsRead: protectedProcedure
       .input(z.object({ notificationIds: z.array(z.number().int().positive()).max(24).optional() }).optional())
       .mutation(({ ctx, input }) => markNotificationsRead(ctx.user.id, input?.notificationIds)),
