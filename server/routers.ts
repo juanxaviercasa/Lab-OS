@@ -11,8 +11,10 @@ import {
   createOperationPlan,
   createSimulatedDevice,
   createSimulationRun,
+  createTelemetrySource,
   getLabDashboard,
   getTelemetryHistory,
+  previewTelemetrySource,
   registerBlockedPhysicalAttempt,
   resolveOperationPlan,
   updateLabConfiguration,
@@ -79,6 +81,12 @@ export const appRouter = router({
     runSimulation: protectedProcedure
       .input(z.object({ scenario: z.enum(["riego", "luz", "nutrientes", "energia"]), durationHours: z.number().int().min(1).max(72), targetZone: z.string().min(2).max(120) }))
       .mutation(({ ctx, input }) => createSimulationRun(ctx.user.id, input)),
+    createTelemetrySource: protectedProcedure
+      .input(z.object({ name: z.string().min(3).max(140), endpointUrl: z.string().url().max(500), authMode: z.enum(["none", "bearer_placeholder"]), credentialReference: z.string().max(140).optional() }))
+      .mutation(({ ctx, input }) => createTelemetrySource(ctx.user.id, input)),
+    previewTelemetrySource: protectedProcedure
+      .input(z.object({ sourceId: z.number().int().positive() }))
+      .mutation(({ ctx, input }) => previewTelemetrySource(ctx.user.id, input.sourceId)),
   }),
 });
 

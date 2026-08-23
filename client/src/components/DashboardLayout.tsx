@@ -27,6 +27,7 @@ import {
   Boxes,
   ClipboardCheck,
   ChartNoAxesCombined,
+  Radio,
   FlaskConical,
   LayoutDashboard,
   LogOut,
@@ -42,7 +43,9 @@ const menuItems = [
   { icon: Boxes, label: "Gemelo digital", path: "/gemelo" },
   { icon: ClipboardCheck, label: "Operaciones", path: "/operaciones" },
   { icon: ChartNoAxesCombined, label: "Simulación", path: "/simulacion" },
+  { icon: Radio, label: "Telemetría", path: "/telemetria" },
   { icon: FlaskConical, label: "Experimentos", path: "/experimentos" },
+  { icon: Boxes, label: "Proyectos", path: "/proyectos" },
   { icon: Network, label: "Adaptadores", path: "/adaptadores" },
   { icon: Settings2, label: "Configuración", path: "/configuracion" },
 ];

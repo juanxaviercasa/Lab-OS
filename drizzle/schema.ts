@@ -162,6 +162,35 @@ export const simulationRuns = mysqlTable("simulationRuns", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+export const telemetrySources = mysqlTable("telemetrySources", {
+  id: int("id").autoincrement().primaryKey(),
+  labId: int("labId").notNull(),
+  name: varchar("name", { length: 140 }).notNull(),
+  kind: mysqlEnum("kind", ["http_json", "manual_payload"]).default("http_json").notNull(),
+  endpointUrl: varchar("endpointUrl", { length: 500 }).notNull(),
+  authMode: mysqlEnum("authMode", ["none", "bearer_placeholder"]).default("none").notNull(),
+  credentialReference: varchar("credentialReference", { length: 140 }),
+  status: mysqlEnum("status", ["preparada", "conectada", "bloqueada"]).default("preparada").notNull(),
+  schemaJson: text("schemaJson").notNull(),
+  lastCheckedAt: timestamp("lastCheckedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const innovationInitiatives = mysqlTable("innovationInitiatives", {
+  id: int("id").autoincrement().primaryKey(),
+  labId: int("labId").notNull(),
+  slug: varchar("slug", { length: 80 }).notNull(),
+  name: varchar("name", { length: 180 }).notNull(),
+  category: mysqlEnum("category", ["ia_robotica", "agrotech", "food_automation", "assistive_tech"]).notNull(),
+  status: mysqlEnum("status", ["vision", "diseno", "prototipo", "piloto"]).default("vision").notNull(),
+  safetyScope: varchar("safetyScope", { length: 180 }).notNull(),
+  objective: text("objective").notNull(),
+  nextMilestone: text("nextMilestone").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export const integrationAdapters = mysqlTable("integrationAdapters", {
   id: int("id").autoincrement().primaryKey(),
   labId: int("labId").notNull(),
@@ -182,3 +211,5 @@ export type Zone = typeof zones.$inferSelect;
 export type Device = typeof devices.$inferSelect;
 export type OperationPlan = typeof operationPlans.$inferSelect;
 export type SimulationRun = typeof simulationRuns.$inferSelect;
+export type TelemetrySource = typeof telemetrySources.$inferSelect;
+export type InnovationInitiative = typeof innovationInitiatives.$inferSelect;

@@ -5,12 +5,14 @@ import {
   devices,
   experiments,
   integrationAdapters,
+  innovationInitiatives,
   inventoryItems,
   labs,
   labTasks,
   operationPlans,
   sensorReadings,
   simulationRuns,
+  telemetrySources,
   type InsertUser,
   users,
   zones,
@@ -18,8 +20,15 @@ import {
 import { buildBlockedPhysicalAttemptAudit, buildPlanDecisionPersistence, physicalExecutionStatus } from "./labSafety";
 import { runSimulationProjection, type SimulationScenario } from "./labSimulation";
 import { selectTelemetryMetric, selectTelemetryWindow } from "./labAnalytics";
+import { normalizeTelemetryPayload, validatePublicTelemetryUrl } from "./labTelemetrySource";
+import { getDefaultInitiatives } from "./labPortfolio";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+
+/** Solo para pruebas unitarias de persistencia; no se expone al cliente. */
+export function __setDbForTesting(instance: unknown | null) {
+  _db = instance as ReturnType<typeof drizzle> | null;
+}
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
@@ -109,6 +118,21 @@ async function ensureHistoricalTelemetry(labId: number, deviceIds: number[]) {
   })));
   await db.insert(sensorReadings).values(rows);
   await appendAudit(labId, null, "telemetry.history_seeded", "Se inicializaron series históricas simuladas para el panel analítico.", "info", { samples: rows.length });
+}
+
+async function ensureLabCatalog(labId: number) {
+  const db = await getDb();
+  if (!db) return;
+  const [sources, initiatives] = await Promise.all([
+    db.select().from(telemetrySources).where(eq(telemetrySources.labId, labId)).limit(1),
+    db.select().from(innovationInitiatives).where(eq(innovationInitiatives.labId, labId)).limit(1),
+  ]);
+  if (!sources.length) {
+    await db.insert(telemetrySources).values({ labId, name: "Fuente HTTP de telemetría · Placeholder", kind: "http_json", endpointUrl: "https://telemetry.example.invalid/readings", authMode: "none", credentialReference: null, status: "preparada", schemaJson: JSON.stringify({ expected: "{ readings: [{ metric, value, unit, status? }] }", mode: "solo_lectura", commands: "disabled" }) });
+  }
+  if (!initiatives.length) {
+    await db.insert(innovationInitiatives).values(getDefaultInitiatives().map((initiative) => ({ labId, ...initiative })));
+  }
 }
 
 export async function ensureLabForUser(ownerId: number) {
@@ -285,11 +309,12 @@ export async function getLabDashboard(ownerId: number) {
   const db = await getDb();
   if (!db) throw new Error("La base de datos no está disponible.");
   const lab = await ensureLabForUser(ownerId);
+  await ensureLabCatalog(lab.id);
   const deviceRows = await db.select().from(devices).where(eq(devices.labId, lab.id));
   const sensorDeviceIds = deviceRows.filter((item) => item.type === "sensor").map((item) => item.id);
   await ensureHistoricalTelemetry(lab.id, sensorDeviceIds);
   const deviceIds = deviceRows.map((item) => item.id);
-  const [zoneRows, readingRows, taskRows, inventoryRows, experimentRows, planRows, auditRows, adapterRows, simulationRows] = await Promise.all([
+  const [zoneRows, readingRows, taskRows, inventoryRows, experimentRows, planRows, auditRows, adapterRows, simulationRows, sourceRows, initiativeRows] = await Promise.all([
     db.select().from(zones).where(eq(zones.labId, lab.id)),
     deviceIds.length ? db.select().from(sensorReadings).where(inArray(sensorReadings.deviceId, deviceIds)).orderBy(desc(sensorReadings.recordedAt)).limit(16) : Promise.resolve([]),
     db.select().from(labTasks).where(eq(labTasks.labId, lab.id)).orderBy(desc(labTasks.updatedAt)),
@@ -299,9 +324,11 @@ export async function getLabDashboard(ownerId: number) {
     db.select().from(auditLogs).where(eq(auditLogs.labId, lab.id)).orderBy(desc(auditLogs.createdAt)).limit(20),
     db.select().from(integrationAdapters).where(eq(integrationAdapters.labId, lab.id)),
     db.select().from(simulationRuns).where(eq(simulationRuns.labId, lab.id)).orderBy(desc(simulationRuns.createdAt)).limit(12),
+    db.select().from(telemetrySources).where(eq(telemetrySources.labId, lab.id)).orderBy(desc(telemetrySources.updatedAt)),
+    db.select().from(innovationInitiatives).where(eq(innovationInitiatives.labId, lab.id)).orderBy(desc(innovationInitiatives.updatedAt)),
   ]);
 
-  return { lab, zones: zoneRows, devices: deviceRows, readings: readingRows, tasks: taskRows, inventory: inventoryRows, experiments: experimentRows, plans: planRows, audit: auditRows, adapters: adapterRows, simulations: simulationRows };
+  return { lab, zones: zoneRows, devices: deviceRows, readings: readingRows, tasks: taskRows, inventory: inventoryRows, experiments: experimentRows, plans: planRows, audit: auditRows, adapters: adapterRows, simulations: simulationRows, telemetrySources: sourceRows, initiatives: initiativeRows };
 }
 
 export async function getTelemetryHistory(ownerId: number, metric?: string, periodHours = 24) {
@@ -429,4 +456,32 @@ export async function createSimulationRun(ownerId: number, input: { scenario: Si
   });
   await appendAudit(lab.id, ownerId, "simulation.completed", `Se completó una proyección de ${input.scenario} sin control físico.`, "info", { scenario: input.scenario, durationHours: input.durationHours, targetZone: input.targetZone, outcome: projection.result.outcome, physicalExecution: "disabled" });
   return projection;
+}
+
+export async function createTelemetrySource(ownerId: number, input: { name: string; endpointUrl: string; authMode: "none" | "bearer_placeholder"; credentialReference?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("La base de datos no está disponible.");
+  const lab = await ensureLabForUser(ownerId);
+  const endpointUrl = validatePublicTelemetryUrl(input.endpointUrl);
+  await db.insert(telemetrySources).values({ labId: lab.id, name: input.name, kind: "http_json", endpointUrl, authMode: input.authMode, credentialReference: input.credentialReference?.trim() || null, status: "preparada", schemaJson: JSON.stringify({ expected: "{ readings: [{ metric, value, unit, status? }] }", mode: "solo_lectura", commands: "disabled" }) });
+  await appendAudit(lab.id, ownerId, "telemetry.source_created", `Se registró una fuente de telemetría de solo lectura: ${input.name}`, "info", { endpointUrl, authMode: input.authMode, physicalExecution: "disabled" });
+}
+
+export async function previewTelemetrySource(ownerId: number, sourceId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("La base de datos no está disponible.");
+  const lab = await ensureLabForUser(ownerId);
+  const source = (await db.select().from(telemetrySources).where(eq(telemetrySources.id, sourceId)).limit(1))[0];
+  if (!source || source.labId !== lab.id) throw new Error("La fuente no pertenece a este laboratorio.");
+  if (source.authMode !== "none") throw new Error("Esta fuente requiere una credencial segura. Completa la referencia de credencial antes de probarla.");
+  const endpointUrl = validatePublicTelemetryUrl(source.endpointUrl);
+  const response = await fetch(endpointUrl, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(8000) });
+  if (!response.ok) throw new Error(`La fuente respondió con HTTP ${response.status}.`);
+  const points = normalizeTelemetryPayload(await response.json());
+  const sensor = (await db.select().from(devices).where(eq(devices.labId, lab.id)).limit(1))[0];
+  if (!sensor) throw new Error("No existe un dispositivo simulado para asociar la telemetría.");
+  await db.insert(sensorReadings).values(points.map((point) => ({ deviceId: sensor.id, metric: point.metric, unit: point.unit, value: point.value.toFixed(3), thresholdLow: null, thresholdHigh: null, status: point.status, source: "adaptador" as const })));
+  await db.update(telemetrySources).set({ status: "conectada", lastCheckedAt: new Date() }).where(eq(telemetrySources.id, source.id));
+  await appendAudit(lab.id, ownerId, "telemetry.source_previewed", `Se importaron ${points.length} lecturas desde una fuente de solo lectura.`, "info", { sourceId, readings: points.length, physicalExecution: "disabled" });
+  return points;
 }

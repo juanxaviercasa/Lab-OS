@@ -30,3 +30,14 @@
 - [x] Persistir identidad y fecha para las decisiones de rechazo y mostrarlas en la revisión.
 - [x] Añadir pruebas Vitest para consultas de telemetría por métrica y periodo.
 - [x] Añadir pruebas Vitest del procedimiento de telemetría por métrica, periodo y ausencia de datos.
+- [x] Definir fuentes de telemetría de solo lectura con endpoint y credenciales como placeholders protegidos.
+- [x] Implementar la conexión manual de prueba y la ingesta validada de telemetría sin comandos hacia dispositivos.
+- [x] Crear comparación visual entre dos simulaciones con diferencias de métricas y veredicto de umbrales.
+- [x] Formalizar el portafolio de iniciativas: cerebro robótico educativo, cultivo autónomo, cocina automatizada y tecnología asistiva.
+- [x] Añadir una página de proyectos con estado, límites de seguridad y próximo hito de cada iniciativa.
+- [x] Añadir pruebas y verificación visual de integración, comparación y portafolio.
+- [x] Guardar un punto de control de la ampliación de proyectos y telemetría.
+- [x] Mostrar el veredicto de umbrales y comprobaciones por escenario dentro de la comparación visual.
+- [x] Añadir pruebas Vitest de creación y vista previa de fuentes de telemetría de solo lectura.
+- [x] Añadir pruebas Vitest de la lógica comparativa y la estructura del portafolio de iniciativas.
+- [x] Añadir pruebas Vitest del flujo persistente de creación y vista previa de fuentes de telemetría.

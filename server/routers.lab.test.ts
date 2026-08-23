@@ -7,14 +7,16 @@ vi.mock("./db", () => ({
   createLabTask: vi.fn(),
   createOperationPlan: vi.fn(),
   createSimulatedDevice: vi.fn(),
+  createTelemetrySource: vi.fn(),
   getLabDashboard: vi.fn(),
   getTelemetryHistory: vi.fn(),
+  previewTelemetrySource: vi.fn(),
   registerBlockedPhysicalAttempt: vi.fn(),
   resolveOperationPlan: vi.fn(),
   updateLabConfiguration: vi.fn(),
 }));
 
-import { createOperationPlan, getTelemetryHistory, registerBlockedPhysicalAttempt, resolveOperationPlan } from "./db";
+import { createOperationPlan, createTelemetrySource, getTelemetryHistory, previewTelemetrySource, registerBlockedPhysicalAttempt, resolveOperationPlan } from "./db";
 import { appRouter } from "./routers";
 
 const user = {
@@ -105,5 +107,16 @@ describe("procedimientos de LabOS", () => {
     await expect(caller.lab.telemetryHistory({ periodHours: 24 })).resolves.toEqual([]);
     expect(getTelemetryHistory).toHaveBeenNthCalledWith(1, user.id, "Humedad del sustrato", 72);
     expect(getTelemetryHistory).toHaveBeenNthCalledWith(2, user.id, undefined, 24);
+  });
+
+  it("registra y previsualiza una fuente de telemetría solo de lectura", async () => {
+    vi.mocked(createTelemetrySource).mockResolvedValue(undefined);
+    vi.mocked(previewTelemetrySource).mockResolvedValue([{ metric: "Humedad", value: 61, unit: "%", status: "normal" }]);
+    const caller = appRouter.createCaller(createContext());
+    await caller.lab.createTelemetrySource({ name: "Fuente pública", endpointUrl: "https://telemetry.example.org/readings", authMode: "none" });
+    const preview = await caller.lab.previewTelemetrySource({ sourceId: 9 });
+    expect(createTelemetrySource).toHaveBeenCalledWith(user.id, { name: "Fuente pública", endpointUrl: "https://telemetry.example.org/readings", authMode: "none" });
+    expect(previewTelemetrySource).toHaveBeenCalledWith(user.id, 9);
+    expect(preview).toEqual([{ metric: "Humedad", value: 61, unit: "%", status: "normal" }]);
   });
 });
