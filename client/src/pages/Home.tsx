@@ -10,13 +10,14 @@ import { Textarea } from "@/components/ui/textarea";
 import DashboardLayout from "@/components/DashboardLayout";
 import { SimulationConsole } from "@/components/SimulationConsole";
 import { TelemetryCharts, TelemetryOverviewChart } from "@/components/TelemetryCharts";
-import { ProjectPortfolio, SimulationComparison, TelemetrySourcesPanel } from "@/components/LabExtensions";
+import { ProjectPortfolio, SimulationComparison, TelemetrySourcesComparison, TelemetrySourcesPanel } from "@/components/LabExtensions";
 import { RobotBrainDetail } from "@/components/RobotBrainDetail";
 import { SimulationTrajectory } from "@/components/SimulationTrajectory";
 import { LearningVoiceStudio } from "@/components/LearningVoiceStudio";
 import { DataFlowExplorer, KitchenMachineDetail } from "@/components/KitchenAndDataFlow";
 import { VoiceServiceRecorder } from "@/components/VoiceServiceRecorder";
 import { AssistiveTechnologyDetail, CleaningAutomatonDetail, CultivationProjectDetail, VoiceRecognitionControl } from "@/components/ExpansionProjectViews";
+import { ClinicalApprovalComparison, ClinicalApprovalPanel, ClinicalApprovalRecordComparison, CleaningScenarioComparison, CleaningScenarioVerifier } from "@/components/ClinicalAndCleaningControls";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import {
@@ -120,7 +121,7 @@ function ErrorState() { return <Panel className="mx-auto mt-12 max-w-xl p-7 text
 
 function LabWorkspace({ page, data }: { page: PageKey; data: any }) {
   const info = pageInfo[page];
-  const selected = page === "/" ? <CommandCenter data={data} /> : page === "/gemelo" ? <TwinPage data={data} /> : page === "/operaciones" ? <OperationsPage data={data} /> : page === "/simulacion" ? <SimulationPage data={data} /> : page === "/telemetria" ? <TelemetryPage data={data} /> : page === "/experimentos" ? <ExperimentsPage data={data} /> : page === "/proyectos" ? <ProjectsPage data={data} /> : page === "/cerebro-robotico" ? <BrainLearningPage data={data} /> : page === "/cultivo" ? <CultivationProjectDetail data={data} /> : page === "/cocina" ? <KitchenMachineDetail scenarios={data.kitchenScenarios ?? []} stations={data.kitchenStations ?? []} /> : page === "/asistencia" ? <AssistiveTechnologyDetail /> : page === "/limpieza" ? <CleaningAutomatonDetail /> : page === "/adaptadores" ? <AdaptersPage data={data} /> : <ConfigurationPage data={data} />;
+  const selected = page === "/" ? <CommandCenter data={data} /> : page === "/gemelo" ? <TwinPage data={data} /> : page === "/operaciones" ? <OperationsPage data={data} /> : page === "/simulacion" ? <SimulationPage data={data} /> : page === "/telemetria" ? <TelemetryPage data={data} /> : page === "/experimentos" ? <ExperimentsPage data={data} /> : page === "/proyectos" ? <ProjectsPage data={data} /> : page === "/cerebro-robotico" ? <BrainLearningPage data={data} /> : page === "/cultivo" ? <CultivationProjectDetail data={data} /> : page === "/cocina" ? <KitchenMachineDetail scenarios={data.kitchenScenarios ?? []} stations={data.kitchenStations ?? []} /> : page === "/asistencia" ? <div className="space-y-6"><AssistiveTechnologyDetail /><ClinicalApprovalPanel templates={data.clinicalApprovalTemplates ?? []} records={data.clinicalApprovalRecords ?? []} /><ClinicalApprovalComparison templates={data.clinicalApprovalTemplates ?? []} /><ClinicalApprovalRecordComparison templates={data.clinicalApprovalTemplates ?? []} records={data.clinicalApprovalRecords ?? []} /></div> : page === "/limpieza" ? <div className="space-y-6"><CleaningAutomatonDetail /><CleaningScenarioVerifier scenarios={data.cleaningScenarios ?? []} /><CleaningScenarioComparison scenarios={data.cleaningScenarios ?? []} /></div> : page === "/adaptadores" ? <AdaptersPage data={data} /> : <ConfigurationPage data={data} />;
   return <div className="space-y-7"><div className="flex items-start justify-between gap-5"><div><p className="text-[10px] font-semibold uppercase tracking-[0.21em] text-cyan-300">{info.eyebrow}</p><h1 className="mt-1 font-display text-3xl font-medium tracking-tight text-slate-100 sm:text-4xl">{info.title}</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">{info.detail}</p></div><div className="hidden min-w-48 rounded-2xl border border-cyan-300/12 bg-cyan-300/[0.035] p-3 text-right lg:block"><p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Nodo maestro</p><p className="mt-1 text-sm text-cyan-100">{data.lab.name}</p><p className="mt-1 text-xs text-slate-500">{data.lab.location}</p></div></div>{selected}</div>;
 }
 
@@ -137,7 +138,7 @@ function SimulationPage({ data }: { data: any }) { return <div className="space-
 
 function BrainLearningPage({ data }: { data: any }) { return <div className="space-y-6"><RobotBrainDetail modules={data.robotLearningModules ?? []} /><LearningVoiceStudio profiles={data.learningProfiles ?? []} sessions={data.voiceSessions ?? []} /><VoiceRecognitionControl /><VoiceServiceRecorder profiles={data.learningProfiles ?? []} providers={data.voiceProviderConfigs ?? []} /></div>; }
 
-function TelemetryPage({ data }: { data: any }) { return <div className="space-y-6"><TelemetryCharts /><TelemetrySourcesPanel sources={data.telemetrySources ?? []} /></div>; }
+function TelemetryPage({ data }: { data: any }) { return <div className="space-y-6"><TelemetryCharts /><TelemetrySourcesPanel sources={data.telemetrySources ?? []} checks={data.telemetrySourceChecks ?? []} /><TelemetrySourcesComparison sources={data.telemetrySources ?? []} checks={data.telemetrySourceChecks ?? []} /></div>; }
 
 function ProjectsPage({ data }: { data: any }) { return <ProjectPortfolio initiatives={data.initiatives ?? []} />; }
 

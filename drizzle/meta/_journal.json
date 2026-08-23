@@ -71,6 +71,13 @@
       "when": 1787509680317,
       "tag": "0009_nappy_sphinx",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1787510417763,
+      "tag": "0010_volatile_tattoo",
+      "breakpoints": true
     }
   ]
 }

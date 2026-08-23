@@ -77,3 +77,15 @@
 - [x] Construir una vista interactiva del autómata de limpieza para tareas, reciclaje y mantenimiento doméstico simulados.
 - [x] Añadir pruebas y verificación visual de cultivo, asistencia, limpieza y voz.
 - [x] Guardar y sincronizar la expansión validada de LabOS con GitHub.
+- [x] Diseñar una integración configurable de telemetría HTTPS pública y de solo lectura con validación, prueba de conectividad y trazabilidad.
+- [x] Crear plantillas de aprobación clínica para escenarios asistivos con consentimiento, responsable, límites y decisión humana explícita.
+- [x] Modelar escenarios comprobables del autómata de limpieza con métricas de agua, energía, residuos, reciclaje y barreras de seguridad.
+- [x] Construir paneles para configurar, revisar y comparar fuentes HTTPS, aprobaciones clínicas y escenarios de limpieza simulados.
+- [x] Añadir cobertura Vitest y verificación visual de los nuevos flujos sin habilitar control físico.
+- [ ] Guardar y sincronizar la ampliación validada de telemetría, aprobación y limpieza con GitHub.
+- [x] Añadir una comparación lado a lado de escenarios de limpieza con diferencias de métricas y veredictos de simulación.
+- [x] Añadir pruebas de persistencia y entrega del panel para comprobaciones HTTPS, decisiones clínicas y escenarios de limpieza.
+- [x] Añadir una comparación lado a lado de fuentes HTTPS usando su última comprobación, lecturas y veredicto seguro.
+- [x] Verificar en Vitest la persistencia de comprobaciones HTTPS en éxito y fallo controlado.
+- [x] Añadir una comparación lado a lado de aprobaciones clínicas que muestre alcance, consentimiento, evidencia, decisión y límite de seguridad.
+- [x] Añadir una comparación lado a lado de registros clínicos reales que muestre escenario, consentimiento, evidencia, decisión, nota y límite de seguridad.

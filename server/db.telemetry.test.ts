@@ -41,9 +41,18 @@ describe("persistencia del adaptador de telemetría", () => {
     const readings = await previewTelemetrySource(42, 5);
     expect(readings).toHaveLength(1);
     expect(fake.inserts.some((entry) => Array.isArray(entry.values))).toBe(true);
+    expect(fake.inserts.find((entry: any) => entry.table?.[Symbol.for("drizzle:Name")] === "telemetrySourceChecks")?.values).toMatchObject({ sourceId: 5, outcome: "success", readingCount: 1 });
     expect(fake.updates[0]?.values).toMatchObject({ status: "conectada" });
 
     const guarded = createFakeDb({ authMode: "bearer_placeholder" }); __setDbForTesting(guarded.db);
     await expect(previewTelemetrySource(42, 5)).rejects.toThrow("credencial segura");
+    expect(guarded.inserts.find((entry: any) => entry.table?.[Symbol.for("drizzle:Name")] === "telemetrySourceChecks")?.values).toMatchObject({ sourceId: 5, outcome: "blocked" });
+  });
+
+  it("persiste un fallo HTTP controlado sin ejecutar comandos", async () => {
+    const fake = createFakeDb(); __setDbForTesting(fake.db);
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 503, json: async () => ({}) }) as typeof fetch;
+    await expect(previewTelemetrySource(42, 5)).rejects.toThrow("HTTP 503");
+    expect(fake.inserts.find((entry: any) => entry.table?.[Symbol.for("drizzle:Name")] === "telemetrySourceChecks")?.values).toMatchObject({ sourceId: 5, outcome: "http_error", httpStatus: 503, readingCount: 0 });
   });
 });

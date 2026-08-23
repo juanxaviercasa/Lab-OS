@@ -177,6 +177,17 @@ export const telemetrySources = mysqlTable("telemetrySources", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const telemetrySourceChecks = mysqlTable("telemetrySourceChecks", {
+  id: int("id").autoincrement().primaryKey(),
+  labId: int("labId").notNull(),
+  sourceId: int("sourceId").notNull(),
+  outcome: mysqlEnum("outcome", ["success", "http_error", "schema_error", "blocked", "network_error"]).notNull(),
+  httpStatus: int("httpStatus"),
+  readingCount: int("readingCount").default(0).notNull(),
+  summary: text("summary").notNull(),
+  checkedAt: timestamp("checkedAt").defaultNow().notNull(),
+});
+
 export const innovationInitiatives = mysqlTable("innovationInitiatives", {
   id: int("id").autoincrement().primaryKey(),
   labId: int("labId").notNull(),
@@ -285,6 +296,53 @@ export const voiceProviderConfigs = mysqlTable("voiceProviderConfigs", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+export const clinicalApprovalTemplates = mysqlTable("clinicalApprovalTemplates", {
+  id: int("id").autoincrement().primaryKey(),
+  labId: int("labId").notNull(),
+  name: varchar("name", { length: 180 }).notNull(),
+  scope: mysqlEnum("scope", ["movilidad", "transferencia", "alimentacion", "comunicacion"]).notNull(),
+  version: varchar("version", { length: 24 }).default("1.0").notNull(),
+  status: mysqlEnum("status", ["borrador", "lista", "archivada"]).default("borrador").notNull(),
+  requiredRolesJson: text("requiredRolesJson").notNull(),
+  checklistJson: text("checklistJson").notNull(),
+  consentStatement: text("consentStatement").notNull(),
+  safetyBoundary: text("safetyBoundary").notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const clinicalApprovalRecords = mysqlTable("clinicalApprovalRecords", {
+  id: int("id").autoincrement().primaryKey(),
+  labId: int("labId").notNull(),
+  templateId: int("templateId").notNull(),
+  scenarioTitle: varchar("scenarioTitle", { length: 180 }).notNull(),
+  reviewerRole: varchar("reviewerRole", { length: 100 }).notNull(),
+  reviewerName: varchar("reviewerName", { length: 160 }).notNull(),
+  evidenceJson: text("evidenceJson").notNull(),
+  consentConfirmed: boolean("consentConfirmed").default(false).notNull(),
+  decision: mysqlEnum("decision", ["pendiente", "aprobada_simulacion", "rechazada"]).default("pendiente").notNull(),
+  decisionNote: text("decisionNote"),
+  decidedBy: int("decidedBy"),
+  decidedAt: timestamp("decidedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const cleaningScenarios = mysqlTable("cleaningScenarios", {
+  id: int("id").autoincrement().primaryKey(),
+  labId: int("labId").notNull(),
+  name: varchar("name", { length: 180 }).notNull(),
+  area: mysqlEnum("area", ["cocina", "sala", "exterior", "residuos"]).notNull(),
+  taskType: mysqlEnum("taskType", ["vajilla", "superficies", "encerado", "vehiculo", "residuos_reciclaje"]).notNull(),
+  riskLevel: mysqlEnum("riskLevel", ["bajo", "medio", "alto"]).default("bajo").notNull(),
+  metricsJson: text("metricsJson").notNull(),
+  safeguardsJson: text("safeguardsJson").notNull(),
+  verificationJson: text("verificationJson"),
+  status: mysqlEnum("status", ["borrador", "evaluado", "requiere_revision", "bloqueado"]).default("borrador").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export const integrationAdapters = mysqlTable("integrationAdapters", {
   id: int("id").autoincrement().primaryKey(),
   labId: int("labId").notNull(),
@@ -314,3 +372,7 @@ export type VoicePracticeSession = typeof voicePracticeSessions.$inferSelect;
 export type KitchenScenario = typeof kitchenScenarios.$inferSelect;
 export type KitchenStation = typeof kitchenStations.$inferSelect;
 export type VoiceProviderConfig = typeof voiceProviderConfigs.$inferSelect;
+export type TelemetrySourceCheck = typeof telemetrySourceChecks.$inferSelect;
+export type ClinicalApprovalTemplate = typeof clinicalApprovalTemplates.$inferSelect;
+export type ClinicalApprovalRecord = typeof clinicalApprovalRecords.$inferSelect;
+export type CleaningScenario = typeof cleaningScenarios.$inferSelect;

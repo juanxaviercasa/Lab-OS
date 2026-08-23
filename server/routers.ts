@@ -6,6 +6,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import {
   createExperiment,
+  createClinicalApprovalRecord,
   createInventoryItem,
   createLabTask,
   createLearningProfile,
@@ -13,6 +14,7 @@ import {
   createSimulatedDevice,
   createSimulationRun,
   createTelemetrySource,
+  evaluateCleaningScenario,
   getLabDashboard,
   getTelemetryHistory,
   markNotificationsRead,
@@ -91,6 +93,12 @@ export const appRouter = router({
     previewTelemetrySource: protectedProcedure
       .input(z.object({ sourceId: z.number().int().positive() }))
       .mutation(({ ctx, input }) => previewTelemetrySource(ctx.user.id, input.sourceId)),
+    recordClinicalApproval: protectedProcedure
+      .input(z.object({ templateId: z.number().int().positive(), scenarioTitle: z.string().min(5).max(180), reviewerRole: z.string().min(3).max(100), reviewerName: z.string().min(3).max(160), evidence: z.array(z.string().min(2).max(500)).min(1).max(12), consentConfirmed: z.boolean(), decision: z.enum(["aprobar", "rechazar"]), decisionNote: z.string().min(3).max(1200) }))
+      .mutation(({ ctx, input }) => createClinicalApprovalRecord(ctx.user.id, input)),
+    evaluateCleaningScenario: protectedProcedure
+      .input(z.object({ scenarioId: z.number().int().positive() }))
+      .mutation(({ ctx, input }) => evaluateCleaningScenario(ctx.user.id, input.scenarioId)),
     markNotificationsRead: protectedProcedure
       .input(z.object({ notificationIds: z.array(z.number().int().positive()).max(24).optional() }).optional())
       .mutation(({ ctx, input }) => markNotificationsRead(ctx.user.id, input?.notificationIds)),

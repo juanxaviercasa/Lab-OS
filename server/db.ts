@@ -2,6 +2,9 @@ import { asc, desc, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   auditLogs,
+  cleaningScenarios,
+  clinicalApprovalRecords,
+  clinicalApprovalTemplates,
   devices,
   experiments,
   integrationAdapters,
@@ -17,6 +20,7 @@ import {
   robotLearningModules,
   sensorReadings,
   simulationRuns,
+  telemetrySourceChecks,
   telemetrySources,
   type InsertUser,
   users,
@@ -32,6 +36,8 @@ import { getDefaultInitiatives } from "./labPortfolio";
 import { blockedPhysicalNotification, planDecisionNotification } from "./labNotifications";
 import { getDefaultRobotLearningModules } from "./robotLearning";
 import { getDefaultKitchenScenarios } from "./kitchenSimulation";
+import { clinicalRecordCanBeApproved, getDefaultClinicalApprovalTemplates } from "./clinicalApprovals";
+import { getDefaultCleaningScenarios, verifyCleaningScenario } from "./cleaningSimulation";
 import { storagePut } from "./storage";
 import { transcribeAudio } from "./_core/voiceTranscription";
 
@@ -109,6 +115,12 @@ async function createLabNotification(labId: number, kind: "telemetria" | "simula
   await db.insert(labNotifications).values({ labId, kind, severity, title, detail, unread: true });
 }
 
+async function recordTelemetrySourceCheck(labId: number, sourceId: number, outcome: "success" | "http_error" | "schema_error" | "blocked" | "network_error", summary: string, httpStatus: number | null = null, readingCount = 0) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(telemetrySourceChecks).values({ labId, sourceId, outcome, httpStatus, readingCount, summary });
+}
+
 async function ensureHistoricalTelemetry(labId: number, deviceIds: number[]) {
   const db = await getDb();
   if (!db || deviceIds.length === 0) return;
@@ -141,7 +153,7 @@ async function ensureHistoricalTelemetry(labId: number, deviceIds: number[]) {
 async function ensureLabCatalog(labId: number, ownerId?: number) {
   const db = await getDb();
   if (!db) return;
-  const [sources, initiatives, learningModules, notifications, profiles, kitchenRows, stationRows, voiceProviderRows] = await Promise.all([
+  const [sources, initiatives, learningModules, notifications, profiles, kitchenRows, stationRows, voiceProviderRows, clinicalTemplateRows, cleaningRows] = await Promise.all([
     db.select().from(telemetrySources).where(eq(telemetrySources.labId, labId)).limit(1),
     db.select().from(innovationInitiatives).where(eq(innovationInitiatives.labId, labId)),
     db.select().from(robotLearningModules).where(eq(robotLearningModules.labId, labId)).limit(1),
@@ -150,16 +162,14 @@ async function ensureLabCatalog(labId: number, ownerId?: number) {
     db.select().from(kitchenScenarios).where(eq(kitchenScenarios.labId, labId)).limit(1),
     db.select().from(kitchenStations).where(eq(kitchenStations.labId, labId)).limit(1),
     db.select().from(voiceProviderConfigs).where(eq(voiceProviderConfigs.labId, labId)).limit(1),
+    db.select().from(clinicalApprovalTemplates).where(eq(clinicalApprovalTemplates.labId, labId)).limit(1),
+    db.select().from(cleaningScenarios).where(eq(cleaningScenarios.labId, labId)).limit(1),
   ]);
-  if (!sources.length) {
-    await db.insert(telemetrySources).values({ labId, name: "Fuente HTTP de telemetría · Placeholder", kind: "http_json", endpointUrl: "https://telemetry.example.invalid/readings", authMode: "none", credentialReference: null, status: "preparada", schemaJson: JSON.stringify({ expected: "{ readings: [{ metric, value, unit, status? }] }", mode: "solo_lectura", commands: "disabled" }) });
-  }
+  if (!sources.length) await db.insert(telemetrySources).values({ labId, name: "Fuente HTTP de telemetría · Placeholder", kind: "http_json", endpointUrl: "https://telemetry.example.invalid/readings", authMode: "none", credentialReference: null, status: "preparada", schemaJson: JSON.stringify({ expected: "{ readings: [{ metric, value, unit, status? }] }", mode: "solo_lectura", commands: "disabled" }) });
   const existingInitiativeSlugs = new Set(initiatives.map((initiative) => initiative.slug));
   const missingInitiatives = getDefaultInitiatives().filter((initiative) => !existingInitiativeSlugs.has(initiative.slug));
   if (missingInitiatives.length) await db.insert(innovationInitiatives).values(missingInitiatives.map((initiative) => ({ labId, ...initiative })));
-  if (!learningModules.length) {
-    await db.insert(robotLearningModules).values(getDefaultRobotLearningModules().map((module) => ({ labId, ...module })));
-  }
+  if (!learningModules.length) await db.insert(robotLearningModules).values(getDefaultRobotLearningModules().map((module) => ({ labId, ...module })));
   if (!notifications.length) await createLabNotification(labId, "sistema", "info", "Centro de notificaciones listo", "LabOS avisará sobre lecturas nuevas, resultados de simulación y eventos de seguridad.");
   if (!profiles.length && ownerId) await db.insert(learningProfiles).values({ labId, ownerId, displayName: "Perfil de aprendizaje · Placeholder", preferredLanguage: "es", targetLanguage: "en", proficiency: "inicial", learningGoal: "Definir objetivo de práctica e idioma meta.", pace: "constante", privacyAcknowledged: false, active: true });
   if (!kitchenRows.length) await db.insert(kitchenScenarios).values(getDefaultKitchenScenarios().map((scenario) => ({ labId, ...scenario })));
@@ -170,6 +180,11 @@ async function ensureLabCatalog(labId: number, ownerId?: number) {
     { labId, name: "Seguridad", type: "seguridad", status: "activa", description: "Verificación de dieta, alergias y límites de simulación.", safetyMode: "revision_humana", active: true },
   ]);
   if (!voiceProviderRows.length) await db.insert(voiceProviderConfigs).values({ labId, provider: "Transcripción integrada · Placeholder", endpointPlaceholder: "BUILT_IN_FORGE_API_URL", credentialPlaceholder: "BUILT_IN_FORGE_API_KEY", maxAudioMb: 16, enabled: true });
+  if (!clinicalTemplateRows.length) await db.insert(clinicalApprovalTemplates).values(getDefaultClinicalApprovalTemplates().map((template) => ({ labId, name: template.name, scope: template.scope, version: template.version, status: template.status, requiredRolesJson: JSON.stringify(template.requiredRoles), checklistJson: JSON.stringify(template.checklist), consentStatement: template.consentStatement, safetyBoundary: template.safetyBoundary, active: true })));
+  if (!cleaningRows.length) await db.insert(cleaningScenarios).values(getDefaultCleaningScenarios().map((scenario) => {
+    const verification = verifyCleaningScenario(scenario.metrics, scenario.riskLevel);
+    return { labId, name: scenario.name, area: scenario.area, taskType: scenario.taskType, riskLevel: scenario.riskLevel, metricsJson: JSON.stringify(scenario.metrics), safeguardsJson: JSON.stringify(scenario.safeguards), verificationJson: JSON.stringify(verification), status: verification.state === "verificado" ? "evaluado" as const : "requiere_revision" as const };
+  }));
 }
 
 export async function ensureLabForUser(ownerId: number) {
@@ -351,7 +366,7 @@ export async function getLabDashboard(ownerId: number) {
   const sensorDeviceIds = deviceRows.filter((item) => item.type === "sensor").map((item) => item.id);
   await ensureHistoricalTelemetry(lab.id, sensorDeviceIds);
   const deviceIds = deviceRows.map((item) => item.id);
-  const [zoneRows, readingRows, taskRows, inventoryRows, experimentRows, planRows, auditRows, adapterRows, simulationRows, sourceRows, initiativeRows, moduleRows, notificationRows, profileRows, voiceRows, kitchenScenarioRows, kitchenStationRows, voiceProviderConfigRows] = await Promise.all([
+  const [zoneRows, readingRows, taskRows, inventoryRows, experimentRows, planRows, auditRows, adapterRows, simulationRows, sourceRows, sourceCheckRows, initiativeRows, moduleRows, notificationRows, profileRows, voiceRows, kitchenScenarioRows, kitchenStationRows, voiceProviderConfigRows, clinicalTemplateRows, clinicalRecordRows, cleaningScenarioRows] = await Promise.all([
     db.select().from(zones).where(eq(zones.labId, lab.id)),
     deviceIds.length ? db.select().from(sensorReadings).where(inArray(sensorReadings.deviceId, deviceIds)).orderBy(desc(sensorReadings.recordedAt)).limit(16) : Promise.resolve([]),
     db.select().from(labTasks).where(eq(labTasks.labId, lab.id)).orderBy(desc(labTasks.updatedAt)),
@@ -362,6 +377,7 @@ export async function getLabDashboard(ownerId: number) {
     db.select().from(integrationAdapters).where(eq(integrationAdapters.labId, lab.id)),
     db.select().from(simulationRuns).where(eq(simulationRuns.labId, lab.id)).orderBy(desc(simulationRuns.createdAt)).limit(12),
     db.select().from(telemetrySources).where(eq(telemetrySources.labId, lab.id)).orderBy(desc(telemetrySources.updatedAt)),
+    db.select().from(telemetrySourceChecks).where(eq(telemetrySourceChecks.labId, lab.id)).orderBy(desc(telemetrySourceChecks.checkedAt)).limit(24),
     db.select().from(innovationInitiatives).where(eq(innovationInitiatives.labId, lab.id)).orderBy(desc(innovationInitiatives.updatedAt)),
     db.select().from(robotLearningModules).where(eq(robotLearningModules.labId, lab.id)).orderBy(desc(robotLearningModules.progressPct)),
     db.select().from(labNotifications).where(eq(labNotifications.labId, lab.id)).orderBy(desc(labNotifications.createdAt)).limit(24),
@@ -370,9 +386,12 @@ export async function getLabDashboard(ownerId: number) {
     db.select().from(kitchenScenarios).where(eq(kitchenScenarios.labId, lab.id)).orderBy(desc(kitchenScenarios.updatedAt)),
     db.select().from(kitchenStations).where(eq(kitchenStations.labId, lab.id)).orderBy(desc(kitchenStations.updatedAt)),
     db.select().from(voiceProviderConfigs).where(eq(voiceProviderConfigs.labId, lab.id)).orderBy(desc(voiceProviderConfigs.updatedAt)),
+    db.select().from(clinicalApprovalTemplates).where(eq(clinicalApprovalTemplates.labId, lab.id)).orderBy(asc(clinicalApprovalTemplates.name)),
+    db.select().from(clinicalApprovalRecords).where(eq(clinicalApprovalRecords.labId, lab.id)).orderBy(desc(clinicalApprovalRecords.createdAt)).limit(18),
+    db.select().from(cleaningScenarios).where(eq(cleaningScenarios.labId, lab.id)).orderBy(asc(cleaningScenarios.name)),
   ]);
 
-  return { lab, zones: zoneRows, devices: deviceRows, readings: readingRows, tasks: taskRows, inventory: inventoryRows, experiments: experimentRows, plans: planRows, audit: auditRows, adapters: adapterRows, simulations: simulationRows, telemetrySources: sourceRows, initiatives: initiativeRows, robotLearningModules: moduleRows, notifications: notificationRows, learningProfiles: profileRows, voiceSessions: voiceRows, kitchenScenarios: kitchenScenarioRows, kitchenStations: kitchenStationRows, voiceProviderConfigs: voiceProviderConfigRows };
+  return { lab, zones: zoneRows, devices: deviceRows, readings: readingRows, tasks: taskRows, inventory: inventoryRows, experiments: experimentRows, plans: planRows, audit: auditRows, adapters: adapterRows, simulations: simulationRows, telemetrySources: sourceRows, telemetrySourceChecks: sourceCheckRows, initiatives: initiativeRows, robotLearningModules: moduleRows, notifications: notificationRows, learningProfiles: profileRows, voiceSessions: voiceRows, kitchenScenarios: kitchenScenarioRows, kitchenStations: kitchenStationRows, voiceProviderConfigs: voiceProviderConfigRows, clinicalApprovalTemplates: clinicalTemplateRows, clinicalApprovalRecords: clinicalRecordRows, cleaningScenarios: cleaningScenarioRows };
 }
 
 export async function getTelemetryHistory(ownerId: number, metric?: string, periodHours = 24) {
@@ -523,18 +542,79 @@ export async function previewTelemetrySource(ownerId: number, sourceId: number) 
   const lab = await ensureLabForUser(ownerId);
   const source = (await db.select().from(telemetrySources).where(eq(telemetrySources.id, sourceId)).limit(1))[0];
   if (!source || source.labId !== lab.id) throw new Error("La fuente no pertenece a este laboratorio.");
-  if (source.authMode !== "none") throw new Error("Esta fuente requiere una credencial segura. Completa la referencia de credencial antes de probarla.");
-  const endpointUrl = validatePublicTelemetryUrl(source.endpointUrl);
-  const response = await fetch(endpointUrl, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(8000) });
-  if (!response.ok) throw new Error(`La fuente respondió con HTTP ${response.status}.`);
-  const points = normalizeTelemetryPayload(await response.json());
-  const sensor = (await db.select().from(devices).where(eq(devices.labId, lab.id)).limit(1))[0];
-  if (!sensor) throw new Error("No existe un dispositivo simulado para asociar la telemetría.");
-  await db.insert(sensorReadings).values(points.map((point) => ({ deviceId: sensor.id, metric: point.metric, unit: point.unit, value: point.value.toFixed(3), thresholdLow: null, thresholdHigh: null, status: point.status, source: "adaptador" as const })));
-  await db.update(telemetrySources).set({ status: "conectada", lastCheckedAt: new Date() }).where(eq(telemetrySources.id, source.id));
-  await appendAudit(lab.id, ownerId, "telemetry.source_previewed", `Se importaron ${points.length} lecturas desde una fuente de solo lectura.`, "info", { sourceId, readings: points.length, physicalExecution: "disabled" });
-  await createLabNotification(lab.id, "telemetria", points.some((point) => point.status !== "normal") ? "atencion" : "info", "Nuevas lecturas recibidas", `${points.length} lecturas nuevas se incorporaron desde ${source.name}.`);
-  return points;
+  let checkRecorded = false;
+  try {
+    if (source.authMode !== "none") {
+      await recordTelemetrySourceCheck(lab.id, source.id, "blocked", "La comprobación requiere una credencial segura configurada fuera de la interfaz.");
+      checkRecorded = true;
+      throw new Error("Esta fuente requiere una credencial segura. Completa la referencia de credencial antes de probarla.");
+    }
+    let endpointUrl: string;
+    try {
+      endpointUrl = validatePublicTelemetryUrl(source.endpointUrl);
+    } catch (error) {
+      await recordTelemetrySourceCheck(lab.id, source.id, "blocked", error instanceof Error ? error.message : "La fuente no superó la validación de seguridad.");
+      checkRecorded = true;
+      throw error;
+    }
+    const response = await fetch(endpointUrl, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(8000) });
+    if (!response.ok) {
+      await recordTelemetrySourceCheck(lab.id, source.id, "http_error", `La fuente respondió con HTTP ${response.status}.`, response.status);
+      checkRecorded = true;
+      throw new Error(`La fuente respondió con HTTP ${response.status}.`);
+    }
+    let points;
+    try {
+      points = normalizeTelemetryPayload(await response.json());
+    } catch (error) {
+      await recordTelemetrySourceCheck(lab.id, source.id, "schema_error", error instanceof Error ? error.message : "El JSON no cumplió el contrato de lecturas.", response.status);
+      checkRecorded = true;
+      throw error;
+    }
+    const sensor = (await db.select().from(devices).where(eq(devices.labId, lab.id)).limit(1))[0];
+    if (!sensor) throw new Error("No existe un dispositivo simulado para asociar la telemetría.");
+    await db.insert(sensorReadings).values(points.map((point) => ({ deviceId: sensor.id, metric: point.metric, unit: point.unit, value: point.value.toFixed(3), thresholdLow: null, thresholdHigh: null, status: point.status, source: "adaptador" as const })));
+    await db.update(telemetrySources).set({ status: "conectada", lastCheckedAt: new Date() }).where(eq(telemetrySources.id, source.id));
+    await recordTelemetrySourceCheck(lab.id, source.id, "success", `Se validaron ${points.length} lecturas bajo contrato de solo lectura.`, response.status, points.length);
+    checkRecorded = true;
+    await appendAudit(lab.id, ownerId, "telemetry.source_previewed", `Se importaron ${points.length} lecturas desde una fuente de solo lectura.`, "info", { sourceId, readings: points.length, physicalExecution: "disabled" });
+    await createLabNotification(lab.id, "telemetria", points.some((point) => point.status !== "normal") ? "atencion" : "info", "Nuevas lecturas recibidas", `${points.length} lecturas nuevas se incorporaron desde ${source.name}.`);
+    return points;
+  } catch (error) {
+    if (!checkRecorded) await recordTelemetrySourceCheck(lab.id, source.id, "network_error", error instanceof Error ? error.message : "No fue posible completar la comprobación HTTPS.");
+    throw error;
+  }
+}
+
+export async function createClinicalApprovalRecord(ownerId: number, input: { templateId: number; scenarioTitle: string; reviewerRole: string; reviewerName: string; evidence: string[]; consentConfirmed: boolean; decision: "aprobar" | "rechazar"; decisionNote: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("La base de datos no está disponible.");
+  const lab = await ensureLabForUser(ownerId);
+  const template = (await db.select().from(clinicalApprovalTemplates).where(eq(clinicalApprovalTemplates.id, input.templateId)).limit(1))[0];
+  if (!template || template.labId !== lab.id || !template.active) throw new Error("La plantilla clínica no está disponible para este laboratorio.");
+  const review = clinicalRecordCanBeApproved(input);
+  if (input.decision === "aprobar" && !review.canApprove) throw new Error(review.missing.join(" "));
+  const decision = input.decision === "aprobar" ? "aprobada_simulacion" as const : "rechazada" as const;
+  await db.insert(clinicalApprovalRecords).values({ labId: lab.id, templateId: template.id, scenarioTitle: input.scenarioTitle, reviewerRole: input.reviewerRole, reviewerName: input.reviewerName, evidenceJson: JSON.stringify(input.evidence.filter(Boolean)), consentConfirmed: input.consentConfirmed, decision, decisionNote: input.decisionNote, decidedBy: ownerId, decidedAt: new Date() });
+  await appendAudit(lab.id, ownerId, "assistive.clinical_review_recorded", `Se registró una decisión clínica para simulación: ${input.scenarioTitle}.`, input.decision === "aprobar" ? "info" : "atencion", { templateId: template.id, decision, consentConfirmed: input.consentConfirmed, physicalExecution: "disabled" });
+  await createLabNotification(lab.id, "seguridad", input.decision === "aprobar" ? "info" : "atencion", "Revisión clínica registrada", `${template.name} quedó ${decision === "aprobada_simulacion" ? "aprobada exclusivamente para simulación" : "rechazada"}.`);
+  return { decision, review };
+}
+
+export async function evaluateCleaningScenario(ownerId: number, scenarioId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("La base de datos no está disponible.");
+  const lab = await ensureLabForUser(ownerId);
+  const scenario = (await db.select().from(cleaningScenarios).where(eq(cleaningScenarios.id, scenarioId)).limit(1))[0];
+  if (!scenario || scenario.labId !== lab.id) throw new Error("El escenario de limpieza no pertenece a este laboratorio.");
+  let metrics: { waterLiters: number; energyKwh: number; wasteKg: number; recyclingKg: number; exposureMinutes: number };
+  try { metrics = JSON.parse(scenario.metricsJson); } catch { throw new Error("Las métricas del escenario no se pueden verificar."); }
+  const verification = verifyCleaningScenario(metrics, scenario.riskLevel);
+  const status = verification.state === "verificado" ? "evaluado" as const : "requiere_revision" as const;
+  await db.update(cleaningScenarios).set({ verificationJson: JSON.stringify(verification), status }).where(eq(cleaningScenarios.id, scenario.id));
+  await appendAudit(lab.id, ownerId, "cleaning.scenario_evaluated", `Se verificó el escenario de limpieza: ${scenario.name}.`, verification.state === "verificado" ? "info" : "atencion", { scenarioId, status, physicalExecution: "disabled" });
+  await createLabNotification(lab.id, "simulacion", verification.state === "verificado" ? "info" : "atencion", "Escenario de limpieza verificado", `${scenario.name}: ${verification.state.replace("_", " ")}. Ninguna acción física fue habilitada.`);
+  return verification;
 }
 
 export async function markNotificationsRead(ownerId: number, notificationIds?: number[]) {
